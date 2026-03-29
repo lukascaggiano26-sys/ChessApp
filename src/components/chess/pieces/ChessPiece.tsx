@@ -1,17 +1,27 @@
 import type { CSSProperties, JSX } from 'react';
-import { pieceGlyphByType } from './pieceGlyphs';
 import type { ChessPieceProps } from './types';
+import wK from './alpha/wK.svg?url';
+import wQ from './alpha/wQ.svg?url';
+import wR from './alpha/wR.svg?url';
+import wB from './alpha/wB.svg?url';
+import wN from './alpha/wN.svg?url';
+import wP from './alpha/wP.svg?url';
+import bK from './alpha/bK.svg?url';
+import bQ from './alpha/bQ.svg?url';
+import bR from './alpha/bR.svg?url';
+import bB from './alpha/bB.svg?url';
+import bN from './alpha/bN.svg?url';
+import bP from './alpha/bP.svg?url';
 
-const LIGHT_FILL = '#f3efdf';
-const LIGHT_STROKE = '#131313';
-const DARK_FILL = '#1a1a1a';
-const DARK_STROKE = '#0b0b0b';
+const pieceSvgs: Record<string, string> = {
+  wk: wK, wq: wQ, wr: wR, wb: wB, wn: wN, wp: wP,
+  bk: bK, bq: bQ, br: bR, bb: bB, bn: bN, bp: bP,
+};
 
 const sizeToCss = (size: number | string | undefined): string | number => {
   if (size === undefined) {
     return 64;
   }
-
   return typeof size === 'number' ? size : size;
 };
 
@@ -24,11 +34,7 @@ export const ChessPiece = ({
   ghost = false,
   title,
 }: ChessPieceProps): JSX.Element => {
-  const Glyph = pieceGlyphByType[type];
-
-  const fill = color === 'w' ? LIGHT_FILL : DARK_FILL;
-  const stroke = color === 'w' ? LIGHT_STROKE : DARK_STROKE;
-  const strokeWidth = color === 'w' ? 2.6 : 2.2;
+  const src = pieceSvgs[`${color}${type}`];
 
   const style: CSSProperties = {
     width: sizeToCss(size),
@@ -42,15 +48,11 @@ export const ChessPiece = ({
   };
 
   return (
-    <svg
+    <img
+      src={src}
+      alt={title ?? `${color === 'w' ? 'white' : 'black'} ${type}`}
       className={className}
       style={style}
-      viewBox="0 0 100 100"
-      role="img"
-      aria-label={title ?? `${color === 'w' ? 'white' : 'black'} ${type}`}
-    >
-      {title ? <title>{title}</title> : null}
-      <Glyph fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
-    </svg>
+    />
   );
 };
