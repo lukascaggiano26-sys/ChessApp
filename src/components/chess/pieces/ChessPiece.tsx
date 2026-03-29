@@ -1,17 +1,18 @@
 import type { CSSProperties, JSX } from 'react';
 import type { ChessPieceProps } from './types';
-import wK from './alpha/wK.svg?url';
-import wQ from './alpha/wQ.svg?url';
-import wR from './alpha/wR.svg?url';
-import wB from './alpha/wB.svg?url';
-import wN from './alpha/wN.svg?url';
-import wP from './alpha/wP.svg?url';
-import bK from './alpha/bK.svg?url';
-import bQ from './alpha/bQ.svg?url';
-import bR from './alpha/bR.svg?url';
-import bB from './alpha/bB.svg?url';
-import bN from './alpha/bN.svg?url';
-import bP from './alpha/bP.svg?url';
+import wK from 'src/components/chess/pieces/alpha/wK.svg?url';
+import wQ from 'src/components/chess/pieces/alpha/wQ.svg?url';
+import wR from 'src/components/chess/pieces/alpha/wR.svg?url';
+import wB from 'src/components/chess/pieces/alpha/wB.svg?url';
+import wN from 'src/components/chess/pieces/alpha/wN.svg?url';
+import wP from 'src/components/chess/pieces/alpha/wP.svg?url';
+import bK from 'src/components/chess/pieces/alpha/bK.svg?url';
+import bQ from 'src/components/chess/pieces/alpha/bQ.svg?url';
+import bR from 'src/components/chess/pieces/alpha/bR.svg?url';
+import bB from 'src/components/chess/pieces/alpha/bB.svg?url';
+import bN from 'src/components/chess/pieces/alpha/bN.svg?url';
+import bP from 'src/components/chess/pieces/alpha/bP.svg?url';
+
 
 const pieceSvgs: Record<string, string> = {
   wk: wK, wq: wQ, wr: wR, wb: wB, wn: wN, wp: wP,
