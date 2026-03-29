@@ -7,6 +7,8 @@ export interface ChessControllerState {
   legalMoves: Square[];
   lastMove: LastMove | null;
   checkSquare: Square | null;
+  draggedSquare: Square | null;
+  dragOverSquare: Square | null;
 }
 
 export interface UseChessGameOptions {

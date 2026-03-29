@@ -22,6 +22,12 @@ export const InteractiveChessBoard = ({
       legalMoves={controller.legalMoves}
       lastMove={controller.lastMove}
       checkSquare={controller.checkSquare}
+      draggedSquare={controller.draggedSquare}
+      dragOverSquare={controller.dragOverSquare}
+      onPieceDragStart={controller.onPieceDragStart}
+      onPieceDragEnter={controller.onPieceDragEnter}
+      onPieceDrop={controller.onPieceDrop}
+      onPieceDragEnd={controller.onPieceDragEnd}
       pieceSizeRatio={pieceSizeRatio}
     />
   );

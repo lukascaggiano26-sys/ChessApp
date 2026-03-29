@@ -25,6 +25,12 @@ export interface ChessBoardProps {
   legalMoves?: Square[];
   lastMove?: LastMove | null;
   checkSquare?: Square | null;
+  draggedSquare?: Square | null;
+  dragOverSquare?: Square | null;
+  onPieceDragStart?: (square: Square) => void;
+  onPieceDragEnter?: (square: Square) => void;
+  onPieceDrop?: (square: Square) => void;
+  onPieceDragEnd?: () => void;
   className?: string;
   pieceSizeRatio?: number;
 }

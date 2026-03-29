@@ -1,4 +1,4 @@
-import type { CSSProperties, JSX } from 'react';
+import type { CSSProperties, DragEvent, JSX } from 'react';
 import { ChessPiece } from '../pieces';
 import { allSquares, isDarkSquare, parseFenBoard } from './fen';
 import type { ChessBoardProps, Square } from './types';
@@ -28,12 +28,14 @@ const buildSquareOverlay = ({
   legalMoveSet,
   lastMoveSet,
   checkSquare,
+  dragOverSquare,
 }: {
   square: Square;
   selectedSquare: Square | null;
   legalMoveSet: Set<Square>;
   lastMoveSet: Set<Square>;
   checkSquare: Square | null;
+  dragOverSquare: Square | null;
 }): string | undefined => {
   if (square === selectedSquare) {
     return SELECTED_OVERLAY;
@@ -41,6 +43,10 @@ const buildSquareOverlay = ({
 
   if (square === checkSquare) {
     return CHECK_OVERLAY;
+  }
+
+  if (square === dragOverSquare && legalMoveSet.has(square)) {
+    return 'rgba(96, 165, 250, 0.38)';
   }
 
   if (lastMoveSet.has(square)) {
@@ -54,6 +60,34 @@ const buildSquareOverlay = ({
   return undefined;
 };
 
+const setDragPreview = (event: DragEvent<HTMLElement>): void => {
+  const svg = event.currentTarget.querySelector('svg');
+  if (!svg) {
+    return;
+  }
+
+  const ghost = document.createElement('div');
+  ghost.style.position = 'fixed';
+  ghost.style.top = '-1000px';
+  ghost.style.left = '-1000px';
+  ghost.style.width = '56px';
+  ghost.style.height = '56px';
+  ghost.style.pointerEvents = 'none';
+
+  const clonedSvg = svg.cloneNode(true) as SVGElement;
+  clonedSvg.style.width = '56px';
+  clonedSvg.style.height = '56px';
+  clonedSvg.style.opacity = '0.85';
+  ghost.appendChild(clonedSvg);
+
+  document.body.appendChild(ghost);
+  event.dataTransfer.setDragImage(ghost, 28, 28);
+
+  window.setTimeout(() => {
+    ghost.remove();
+  }, 0);
+};
+
 export const ChessBoard = ({
   fen,
   orientation = 'white',
@@ -62,6 +96,12 @@ export const ChessBoard = ({
   legalMoves = [],
   lastMove = null,
   checkSquare = null,
+  draggedSquare = null,
+  dragOverSquare = null,
+  onPieceDragStart,
+  onPieceDragEnter,
+  onPieceDrop,
+  onPieceDragEnd,
   className,
   pieceSizeRatio = 0.84,
 }: ChessBoardProps): JSX.Element => {
@@ -69,6 +109,7 @@ export const ChessBoard = ({
   const displaySquares = createDisplaySquares(orientation);
   const legalMoveSet = new Set(legalMoves);
   const lastMoveSet = new Set<Square>(lastMove ? [lastMove.from, lastMove.to] : []);
+  const draggingEnabled = Boolean(onPieceDragStart && onPieceDrop && onPieceDragEnd);
 
   return (
     <div
@@ -97,6 +138,7 @@ export const ChessBoard = ({
           legalMoveSet,
           lastMoveSet,
           checkSquare,
+          dragOverSquare,
         });
 
         const labelColor = isDarkSquare(square) ? '#fef3c7' : '#7c2d12';
@@ -112,6 +154,8 @@ export const ChessBoard = ({
           alignItems: 'center',
           justifyContent: 'center',
           userSelect: 'none',
+          border: 'none',
+          padding: 0,
         };
 
         return (
@@ -121,14 +165,52 @@ export const ChessBoard = ({
             style={squareStyle}
             onClick={() => onSquareClick?.(square)}
             aria-label={`Square ${square}`}
+            onDragOver={(event) => {
+              if (!draggingEnabled) {
+                return;
+              }
+              event.preventDefault();
+            }}
+            onDragEnter={() => onPieceDragEnter?.(square)}
+            onDrop={(event) => {
+              if (!draggingEnabled) {
+                return;
+              }
+              event.preventDefault();
+              onPieceDrop?.(square);
+            }}
           >
             {piece ? (
-              <ChessPiece
-                type={piece.type}
-                color={piece.color}
-                size={`${pieceSizeRatio * 100}%`}
-                title={`${piece.color}-${piece.type}`}
-              />
+              <span
+                draggable={draggingEnabled}
+                onDragStart={(event) => {
+                  if (!draggingEnabled) {
+                    return;
+                  }
+                  event.dataTransfer.effectAllowed = 'move';
+                  event.dataTransfer.setData('text/plain', square);
+                  setDragPreview(event);
+                  onPieceDragStart?.(square);
+                }}
+                onDragEnd={() => onPieceDragEnd?.()}
+                style={{
+                  width: `${pieceSizeRatio * 100}%`,
+                  height: `${pieceSizeRatio * 100}%`,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: draggedSquare === square ? 0.25 : 1,
+                  cursor: draggingEnabled ? 'grab' : 'inherit',
+                }}
+              >
+                <ChessPiece
+                  type={piece.type}
+                  color={piece.color}
+                  size="100%"
+                  ghost={draggedSquare === square}
+                  title={`${piece.color}-${piece.type}`}
+                />
+              </span>
             ) : null}
 
             {isLegal ? (

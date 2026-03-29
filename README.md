@@ -1,177 +1,103 @@
 # ChessApp UI Components
 
-This repository contains a modular chess UI foundation with:
+A modular chess UI foundation with:
 
-1. **Custom SVG chess pieces** (cartoonish, flat, bold silhouettes).
-2. **A presentational FEN-driven chessboard** that renders an 8x8 board with orientation and visual state support.
-3. **An interactive click-to-move controller** using `chess.js` for legal move generation and game state transitions.
+- custom SVG chess pieces,
+- a presentational FEN-driven board,
+- a controller hook/wrapper for click-to-move **and** drag-and-drop movement.
 
----
+## Features delivered
 
-## What was delivered across PRs
+### Custom SVG piece set
+- 12 pieces via reusable `ChessPiece` (`type`, `color`, `size`, `className`, `selected`, `ghost`).
+- Flat, bold, high-contrast style.
+- Demo component: `ChessPieceDemo`.
 
-### 1) Custom piece set (SVG)
-
-Implemented reusable piece rendering via:
-
-- `ChessPiece` API:
-  - `type="p|n|b|r|q|k"`
-  - `color="w|b"`
-  - `size`
-  - `className`
-  - `selected`
-  - `ghost`
-- Complete 12-piece support via 6 glyph types x 2 colors.
-- White pieces render with light fill and dark outline.
-- Black pieces render with dark fill.
-- `ChessPieceDemo` included for quick local preview.
-
-Files:
-- `src/components/chess/pieces/types.ts`
-- `src/components/chess/pieces/pieceGlyphs.tsx`
-- `src/components/chess/pieces/ChessPiece.tsx`
-- `src/components/chess/pieces/ChessPieceDemo.tsx`
-- `src/components/chess/pieces/index.ts`
-
-### 2) Presentational board renderer
-
-Implemented `ChessBoard` that:
-
-- Renders an 8x8 responsive grid.
-- Supports white/black orientation.
-- Reads board position from **FEN**.
-- Uses the custom `ChessPiece` SVG components.
-- Exposes view-state props:
-  - `selectedSquare`
-  - `legalMoves`
-  - `lastMove`
-  - `checkSquare`
-- Supports square click callback via `onSquareClick`.
-- Displays board coordinates (files/ranks) cleanly.
-
-Files:
-- `src/components/chess/board/types.ts`
-- `src/components/chess/board/fen.ts`
-- `src/components/chess/board/ChessBoard.tsx`
-- `src/components/chess/board/index.ts`
-
-### 3) Interactive click-to-move behavior (this PR)
-
-Implemented controller-level interaction logic with `chess.js`:
-
-- Click a piece on side-to-move to select it.
-- Show only that piece's legal destination squares.
-- Click legal destination to make move.
-- Deselect on selected-square re-click.
-- Deselect on invalid target click.
-- Turn switching handled by `chess.js` after each move.
-- Board re-renders from updated FEN.
-- Tracks and exposes:
+### Presentational board
+- `ChessBoard` renders an 8x8 responsive grid from FEN.
+- Supports `orientation="white" | "black"`.
+- Renders rank/file coordinates.
+- Visual highlights:
   - selected square
-  - legal moves
+  - legal destinations
   - last move
-  - side-to-move king check square
+  - check square
+- Uses only custom SVG pieces (no Unicode).
 
-Files:
-- `src/components/chess/game/types.ts`
-- `src/components/chess/game/useChessGame.ts`
-- `src/components/chess/game/InteractiveChessBoard.tsx`
-- `src/components/chess/game/index.ts`
-
----
+### Interactive controller
+- `useChessGame` + `InteractiveChessBoard` integrate `chess.js` for rules/state.
+- Supports both interaction models:
+  - click-to-move
+  - drag-and-drop
+- Drag behavior:
+  - draggable side-to-move pieces only
+  - legal targets highlighted during drag
+  - custom piece ghost drag preview (from SVG clone)
+  - illegal drops prevented
+- Move result tracking:
+  - updated FEN
+  - turn switching
+  - last move
+  - check square
 
 ## Architecture
 
-The code is intentionally separated into layers:
+- `src/components/chess/pieces/*` → piece visuals only.
+- `src/components/chess/board/*` → board rendering only.
+- `src/components/chess/game/*` → game/controller logic and interactions.
 
-- **Presentational layer** (`board`, `pieces`):
-  - pure rendering
-  - no move legality logic
-- **Controller/state layer** (`game`):
-  - selection and click-to-move behavior
-  - legal move generation and move execution with `chess.js`
+This separation is designed for future PGN, undo/redo, engine analysis, and move classification.
 
-This separation keeps the API easy to extend for:
-
-- PGN export/import
-- undo/redo
-- engine analysis hooks
-- move annotations/classification
-
----
-
-## Public APIs
+## Public API
 
 ### `ChessPiece`
-
 ```tsx
-<ChessPiece
-  type="q"
-  color="w"
-  size={64}
-  className="piece"
-  selected={false}
-  ghost={false}
-/>
+<ChessPiece type="q" color="w" size={64} selected={false} ghost={false} />
 ```
 
 ### `ChessBoard` (presentational)
-
 ```tsx
 <ChessBoard
   fen={fen}
   orientation="white"
-  onSquareClick={(square) => console.log(square)}
+  onSquareClick={handleSquareClick}
   selectedSquare={selectedSquare}
   legalMoves={legalMoves}
   lastMove={lastMove}
   checkSquare={checkSquare}
+  draggedSquare={draggedSquare}
+  dragOverSquare={dragOverSquare}
+  onPieceDragStart={onPieceDragStart}
+  onPieceDragEnter={onPieceDragEnter}
+  onPieceDrop={onPieceDrop}
+  onPieceDragEnd={onPieceDragEnd}
 />
 ```
 
-### `InteractiveChessBoard` (controller + board)
-
+### `InteractiveChessBoard`
 ```tsx
 <InteractiveChessBoard
   initialFen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-  orientation="white"
+  orientation="black"
   onMove={(state) => console.log(state.fen, state.lastMove)}
 />
 ```
 
 ### `useChessGame`
+Returns state + handlers:
+- `fen`, `turn`
+- `selectedSquare`, `legalMoves`
+- `lastMove`, `checkSquare`
+- `draggedSquare`, `dragOverSquare`
+- `onSquareClick`
+- `onPieceDragStart`, `onPieceDragEnter`, `onPieceDrop`, `onPieceDragEnd`
+- `reset`, `getGame`
 
-Returns controller state + actions:
+## Dependency
 
-- `fen`
-- `turn`
-- `selectedSquare`
-- `legalMoves`
-- `lastMove`
-- `checkSquare`
-- `onSquareClick(square)`
-- `reset(fen?)`
-- `getGame()` (raw `chess.js` instance access)
-
----
-
-## Dependency choice
-
-`chess.js` is used as the lightweight robust rules engine for:
-
-- legal move generation
-- move validation
-- turn management
-- FEN updates
-- check detection
-
-Dependency declared in `package.json`.
-
----
+`chess.js` is used as the lightweight robust rules engine.
 
 ## Notes
 
-- Promotion defaults to queen in click-to-move flow (`promotion: 'q'`) for now.
-- No drag-and-drop behavior yet; current interaction is click-to-move.
-- Automated tests are not yet included in this repository.
-
+- Promotion currently defaults to queen for move execution.
+- Drag-and-drop targets are square-driven (no fragile pixel coordinate math), so flipped orientation remains correct.

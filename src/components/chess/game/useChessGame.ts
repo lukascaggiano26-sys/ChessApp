@@ -30,6 +30,8 @@ const buildInitialState = (game: ChessInstance): ChessControllerState => ({
   legalMoves: [],
   lastMove: null,
   checkSquare: null,
+  draggedSquare: null,
+  dragOverSquare: null,
 });
 
 const getLegalDestinations = (game: ChessInstance, from: Square): Square[] => {
@@ -73,12 +75,17 @@ export const useChessGame = ({
   const gameRef = useRef<ChessInstance>(new Chess(initialFen) as unknown as ChessInstance);
   const [state, setState] = useState<ChessControllerState>(() => buildInitialState(gameRef.current));
 
-  const setSelection = useCallback((selectedSquare: Square | null) => {
-    if (!selectedSquare) {
-      setState((prev) => ({ ...prev, selectedSquare: null, legalMoves: [] }));
-      return;
-    }
+  const clearSelection = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      selectedSquare: null,
+      legalMoves: [],
+      draggedSquare: null,
+      dragOverSquare: null,
+    }));
+  }, []);
 
+  const selectSquare = useCallback((selectedSquare: Square) => {
     const legalMoves = getLegalDestinations(gameRef.current, selectedSquare);
     setState((prev) => ({ ...prev, selectedSquare, legalMoves }));
   }, []);
@@ -87,7 +94,7 @@ export const useChessGame = ({
     (from: Square, to: Square) => {
       const result = gameRef.current.move({ from, to, promotion: 'q' });
       if (!result) {
-        setSelection(null);
+        clearSelection();
         return;
       }
 
@@ -98,12 +105,14 @@ export const useChessGame = ({
         legalMoves: [],
         lastMove: { from: asSquare(result.from), to: asSquare(result.to) } satisfies LastMove,
         checkSquare: kingSquareForTurn(gameRef.current),
+        draggedSquare: null,
+        dragOverSquare: null,
       };
 
       setState(nextState);
       onMove?.(nextState);
     },
-    [onMove, setSelection],
+    [clearSelection, onMove],
   );
 
   const onSquareClick = useCallback(
@@ -111,7 +120,7 @@ export const useChessGame = ({
       const selected = state.selectedSquare;
 
       if (selected && square === selected) {
-        setSelection(null);
+        clearSelection();
         return;
       }
 
@@ -123,37 +132,107 @@ export const useChessGame = ({
 
         const clickedPiece = gameRef.current.get(square);
         if (clickedPiece && clickedPiece.color === gameRef.current.turn()) {
-          setSelection(square);
+          selectSquare(square);
           return;
         }
 
-        setSelection(null);
+        clearSelection();
         return;
       }
 
       const piece = gameRef.current.get(square);
       if (piece && piece.color === gameRef.current.turn()) {
-        setSelection(square);
+        selectSquare(square);
         return;
       }
 
-      setSelection(null);
+      clearSelection();
     },
-    [applyMove, setSelection, state.legalMoves, state.selectedSquare],
+    [applyMove, clearSelection, selectSquare, state.legalMoves, state.selectedSquare],
   );
 
-  const reset = useCallback((fen: string = initialFen) => {
-    gameRef.current = new Chess(fen) as unknown as ChessInstance;
-    setState(buildInitialState(gameRef.current));
-  }, [initialFen]);
+  const onPieceDragStart = useCallback(
+    (square: Square) => {
+      const piece = gameRef.current.get(square);
+      if (!piece || piece.color !== gameRef.current.turn()) {
+        clearSelection();
+        return;
+      }
+
+      const legalMoves = getLegalDestinations(gameRef.current, square);
+      if (!legalMoves.length) {
+        clearSelection();
+        return;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        selectedSquare: square,
+        legalMoves,
+        draggedSquare: square,
+        dragOverSquare: null,
+      }));
+    },
+    [clearSelection],
+  );
+
+  const onPieceDragEnter = useCallback((square: Square) => {
+    setState((prev) => {
+      if (!prev.draggedSquare) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        dragOverSquare: prev.legalMoves.includes(square) ? square : null,
+      };
+    });
+  }, []);
+
+  const onPieceDrop = useCallback(
+    (square: Square) => {
+      const from = state.draggedSquare;
+      if (!from) {
+        return;
+      }
+
+      if (!state.legalMoves.includes(square)) {
+        clearSelection();
+        return;
+      }
+
+      applyMove(from, square);
+    },
+    [applyMove, clearSelection, state.draggedSquare, state.legalMoves],
+  );
+
+  const onPieceDragEnd = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      draggedSquare: null,
+      dragOverSquare: null,
+    }));
+  }, []);
+
+  const reset = useCallback(
+    (fen: string = initialFen) => {
+      gameRef.current = new Chess(fen) as unknown as ChessInstance;
+      setState(buildInitialState(gameRef.current));
+    },
+    [initialFen],
+  );
 
   return useMemo(
     () => ({
       ...state,
       onSquareClick,
+      onPieceDragStart,
+      onPieceDragEnter,
+      onPieceDrop,
+      onPieceDragEnd,
       reset,
       getGame: () => gameRef.current,
     }),
-    [onSquareClick, reset, state],
+    [onPieceDragEnd, onPieceDragEnter, onPieceDragStart, onPieceDrop, onSquareClick, reset, state],
   );
 };
