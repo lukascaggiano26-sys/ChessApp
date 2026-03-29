@@ -11,7 +11,7 @@
   --legal-dot: rgba(17, 24, 39, 0.35);
   --capture-ring: rgba(17, 24, 39, 0.42);
 
-  width: 100%;
+  width: min(100%, calc(100vw - 16px));
   max-width: 720px;
   aspect-ratio: 1 / 1;
   display: grid;
@@ -34,6 +34,7 @@
   align-items: center;
   justify-content: center;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
   transition: filter 140ms ease, box-shadow 140ms ease, transform 120ms ease;
   will-change: filter;
 }
@@ -138,4 +139,27 @@
   height: 72%;
   border-radius: 9999px;
   border: 4px solid var(--capture-ring);
+}
+
+@media (max-width: 700px) {
+  .chess-board {
+    border-radius: 10px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
+  }
+
+  .coord-label {
+    font-size: 10px;
+  }
+
+  .piece-wrap {
+    width: calc(max(var(--piece-size-ratio, 0.84), 0.88) * 100%);
+    height: calc(max(var(--piece-size-ratio, 0.84), 0.88) * 100%);
+  }
+}
+
+@media (hover: none) {
+  .chess-square.is-hoverable:hover {
+    filter: none;
+    box-shadow: none;
+  }
 }

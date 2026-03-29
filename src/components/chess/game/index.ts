@@ -1,3 +1,10 @@
+export { ChessBoardWithControls } from './ChessBoardWithControls';
 export { InteractiveChessBoard } from './InteractiveChessBoard';
 export { useChessGame } from './useChessGame';
-export type { ChessControllerState, InteractiveChessBoardProps, UseChessGameOptions } from './types';
+export type {
+  ChessBoardWithControlsProps,
+  ChessControllerState,
+  ChessGameStatus,
+  InteractiveChessBoardProps,
+  UseChessGameOptions,
+} from './types';

@@ -8,6 +8,28 @@ A modular chess UI foundation with:
 
 ## Features delivered
 
+## Run the interactive UI locally
+
+You can now launch a playable interactive board UI from this repo.
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Start the dev server:
+   ```bash
+   npm run dev
+   ```
+3. Open the local URL shown by Vite (typically `http://localhost:5173`).
+4. Play using either:
+   - tap/click-to-move, or
+   - drag-and-drop (desktop pointers).
+5. Use the control panel to:
+   - start a new game/reset
+   - undo/redo
+   - load FEN / copy current FEN
+   - inspect turn, status, and move list
+
 ### Custom SVG piece set
 - 12 pieces via reusable `ChessPiece` (`type`, `color`, `size`, `className`, `selected`, `ghost`).
 - Flat, bold, high-contrast style.
@@ -33,6 +55,24 @@ A modular chess UI foundation with:
   - outer rings for captures
 - Refined last-move and check highlights with better contrast hierarchy.
 - Subtle transition timing for square/piece state changes (no heavy animation).
+
+
+
+### Mobile responsiveness
+- Board width is constrained to viewport and remains square.
+- Piece sizing scales up slightly on small screens to keep silhouettes readable.
+- Control buttons become larger touch targets and stack in a 2-column grid on phones.
+- On coarse-pointer devices, drag behavior de-emphasizes and tap-to-move remains the primary interaction.
+
+### Control panel
+- `ChessBoardWithControls` adds:
+  - New game / Reset
+  - Undo / Redo
+  - Load FEN
+  - Copy current FEN
+  - Turn indicator
+  - Game status (checkmate, stalemate, draw, insufficient material, check)
+  - Move list (simple SAN)
 
 ### Interactive controller
 - `useChessGame` + `InteractiveChessBoard` integrate `chess.js` for rules/state.
@@ -82,6 +122,11 @@ This separation is designed for future PGN, undo/redo, engine analysis, and move
   onPieceDrop={onPieceDrop}
   onPieceDragEnd={onPieceDragEnd}
 />
+```
+
+### `ChessBoardWithControls`
+```tsx
+<ChessBoardWithControls orientation="white" showMoveList />
 ```
 
 ### `InteractiveChessBoard`
