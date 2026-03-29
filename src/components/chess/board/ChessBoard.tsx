@@ -1,51 +1,10 @@
-import type { DragEvent, JSX } from 'react';
+import type { JSX } from 'react';
+import { useEffect, useState } from 'react';
 import { ChessPiece } from '../pieces';
 import { allSquares, isDarkSquare, parseFenBoard } from './fen';
 import type { ChessBoardProps, Square } from './types';
+import { cn, createDisplaySquares, setDragPreviewFromPiece } from './boardViewUtils';
 import './ChessBoard.css';
-
-const FILES_WHITE: Square['0'][] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-const FILES_BLACK: Square['0'][] = ['h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'];
-const RANKS_WHITE: Square['1'][] = ['8', '7', '6', '5', '4', '3', '2', '1'];
-const RANKS_BLACK: Square['1'][] = ['1', '2', '3', '4', '5', '6', '7', '8'];
-
-const createDisplaySquares = (orientation: 'white' | 'black'): Square[] => {
-  const files = orientation === 'white' ? FILES_WHITE : FILES_BLACK;
-  const ranks = orientation === 'white' ? RANKS_WHITE : RANKS_BLACK;
-
-  return ranks.flatMap((rank) => files.map((file) => `${file}${rank}` as Square));
-};
-
-const cn = (...classes: Array<string | false | null | undefined>): string =>
-  classes.filter(Boolean).join(' ');
-
-const setDragPreview = (event: DragEvent<HTMLElement>): void => {
-  const svg = event.currentTarget.querySelector('svg');
-  if (!svg) {
-    return;
-  }
-
-  const ghost = document.createElement('div');
-  ghost.style.position = 'fixed';
-  ghost.style.top = '-1000px';
-  ghost.style.left = '-1000px';
-  ghost.style.width = '58px';
-  ghost.style.height = '58px';
-  ghost.style.pointerEvents = 'none';
-
-  const clonedSvg = svg.cloneNode(true) as SVGElement;
-  clonedSvg.style.width = '58px';
-  clonedSvg.style.height = '58px';
-  clonedSvg.style.opacity = '0.9';
-  ghost.appendChild(clonedSvg);
-
-  document.body.appendChild(ghost);
-  event.dataTransfer.setDragImage(ghost, 29, 29);
-
-  window.setTimeout(() => {
-    ghost.remove();
-  }, 0);
-};
 
 export const ChessBoard = ({
   fen,
@@ -68,7 +27,27 @@ export const ChessBoard = ({
   const displaySquares = createDisplaySquares(orientation);
   const legalMoveSet = new Set(legalMoves);
   const lastMoveSet = new Set<Square>(lastMove ? [lastMove.from, lastMove.to] : []);
-  const draggingEnabled = Boolean(onPieceDragStart && onPieceDrop && onPieceDragEnd);
+  const [coarsePointer, setCoarsePointer] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const media = window.matchMedia('(pointer: coarse)');
+    const update = () => setCoarsePointer(media.matches);
+    update();
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', update);
+      return () => media.removeEventListener('change', update);
+    }
+
+    media.addListener(update);
+    return () => media.removeListener(update);
+  }, []);
+
+  const draggingEnabled = Boolean(onPieceDragStart && onPieceDrop && onPieceDragEnd && !coarsePointer);
 
   return (
     <div
@@ -137,7 +116,7 @@ export const ChessBoard = ({
                   }
                   event.dataTransfer.effectAllowed = 'move';
                   event.dataTransfer.setData('text/plain', square);
-                  setDragPreview(event);
+                  setDragPreviewFromPiece(event);
                   onPieceDragStart?.(square);
                 }}
                 onDragEnd={() => onPieceDragEnd?.()}
