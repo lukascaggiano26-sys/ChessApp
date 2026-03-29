@@ -44,6 +44,7 @@ export const ChessBoardWithControls = ({
   const controller = useChessGame({ initialFen, orientation, onMove });
   const [fenInput, setFenInput] = useState(controller.fen);
   const [fenError, setFenError] = useState<string | null>(null);
+  const [currentOrientation, setCurrentOrientation] = useState(orientation);
 
   const groupedMoves = useMemo(() => {
     const rows: string[] = [];
@@ -76,6 +77,15 @@ export const ChessBoardWithControls = ({
         <button
           type="button"
           className="chess-btn"
+          onClick={() =>
+            setCurrentOrientation((value) => (value === 'white' ? 'black' : 'white'))
+          }
+        >
+          Flip board ({currentOrientation === 'white' ? 'White' : 'Black'} view)
+        </button>
+        <button
+          type="button"
+          className="chess-btn"
           onClick={async () => {
             try {
               if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
@@ -98,7 +108,7 @@ export const ChessBoardWithControls = ({
       <div className="chess-layout">
         <ChessBoard
           fen={controller.fen}
-          orientation={orientation}
+          orientation={currentOrientation}
           onSquareClick={controller.onSquareClick}
           selectedSquare={controller.selectedSquare}
           legalMoves={controller.legalMoves}
