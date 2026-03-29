@@ -16,6 +16,7 @@
   aspect-ratio: 1 / 1;
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(8, 1fr);
   border: 1px solid var(--board-border);
   border-radius: 14px;
   overflow: hidden;
@@ -26,6 +27,7 @@
 }
 
 .chess-square {
+  aspect-ratio: 1 / 1;
   position: relative;
   border: none;
   padding: 0;
