@@ -1,14 +1,8 @@
-import type { CSSProperties, DragEvent, JSX } from 'react';
+import type { DragEvent, JSX } from 'react';
 import { ChessPiece } from '../pieces';
 import { allSquares, isDarkSquare, parseFenBoard } from './fen';
 import type { ChessBoardProps, Square } from './types';
-
-const LIGHT_SQUARE = '#f0d9b5';
-const DARK_SQUARE = '#b58863';
-const SELECTED_OVERLAY = 'rgba(252, 211, 77, 0.55)';
-const LEGAL_MOVE_DOT = 'rgba(20, 20, 20, 0.35)';
-const LAST_MOVE_OVERLAY = 'rgba(110, 231, 183, 0.36)';
-const CHECK_OVERLAY = 'rgba(239, 68, 68, 0.6)';
+import './ChessBoard.css';
 
 const FILES_WHITE: Square['0'][] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const FILES_BLACK: Square['0'][] = ['h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'];
@@ -22,43 +16,8 @@ const createDisplaySquares = (orientation: 'white' | 'black'): Square[] => {
   return ranks.flatMap((rank) => files.map((file) => `${file}${rank}` as Square));
 };
 
-const buildSquareOverlay = ({
-  square,
-  selectedSquare,
-  legalMoveSet,
-  lastMoveSet,
-  checkSquare,
-  dragOverSquare,
-}: {
-  square: Square;
-  selectedSquare: Square | null;
-  legalMoveSet: Set<Square>;
-  lastMoveSet: Set<Square>;
-  checkSquare: Square | null;
-  dragOverSquare: Square | null;
-}): string | undefined => {
-  if (square === selectedSquare) {
-    return SELECTED_OVERLAY;
-  }
-
-  if (square === checkSquare) {
-    return CHECK_OVERLAY;
-  }
-
-  if (square === dragOverSquare && legalMoveSet.has(square)) {
-    return 'rgba(96, 165, 250, 0.38)';
-  }
-
-  if (lastMoveSet.has(square)) {
-    return LAST_MOVE_OVERLAY;
-  }
-
-  if (legalMoveSet.has(square)) {
-    return 'rgba(59, 130, 246, 0.20)';
-  }
-
-  return undefined;
-};
+const cn = (...classes: Array<string | false | null | undefined>): string =>
+  classes.filter(Boolean).join(' ');
 
 const setDragPreview = (event: DragEvent<HTMLElement>): void => {
   const svg = event.currentTarget.querySelector('svg');
@@ -70,18 +29,18 @@ const setDragPreview = (event: DragEvent<HTMLElement>): void => {
   ghost.style.position = 'fixed';
   ghost.style.top = '-1000px';
   ghost.style.left = '-1000px';
-  ghost.style.width = '56px';
-  ghost.style.height = '56px';
+  ghost.style.width = '58px';
+  ghost.style.height = '58px';
   ghost.style.pointerEvents = 'none';
 
   const clonedSvg = svg.cloneNode(true) as SVGElement;
-  clonedSvg.style.width = '56px';
-  clonedSvg.style.height = '56px';
-  clonedSvg.style.opacity = '0.85';
+  clonedSvg.style.width = '58px';
+  clonedSvg.style.height = '58px';
+  clonedSvg.style.opacity = '0.9';
   ghost.appendChild(clonedSvg);
 
   document.body.appendChild(ghost);
-  event.dataTransfer.setDragImage(ghost, 28, 28);
+  event.dataTransfer.setDragImage(ghost, 29, 29);
 
   window.setTimeout(() => {
     ghost.remove();
@@ -113,16 +72,9 @@ export const ChessBoard = ({
 
   return (
     <div
-      className={className}
+      className={cn('chess-board', className)}
       style={{
-        width: '100%',
-        maxWidth: 720,
-        aspectRatio: '1 / 1',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(8, minmax(0, 1fr))',
-        border: '1px solid #111827',
-        borderRadius: 8,
-        overflow: 'hidden',
+        ['--piece-size-ratio' as string]: String(pieceSizeRatio),
       }}
     >
       {displaySquares.map((square, index) => {
@@ -131,38 +83,29 @@ export const ChessBoard = ({
         const rank = square[1];
         const fileIndex = index % 8;
         const rankIndex = Math.floor(index / 8);
-        const background = isDarkSquare(square) ? DARK_SQUARE : LIGHT_SQUARE;
-        const overlay = buildSquareOverlay({
-          square,
-          selectedSquare,
-          legalMoveSet,
-          lastMoveSet,
-          checkSquare,
-          dragOverSquare,
-        });
-
-        const labelColor = isDarkSquare(square) ? '#fef3c7' : '#7c2d12';
+        const darkSquare = isDarkSquare(square);
         const showRankLabel = fileIndex === 0;
         const showFileLabel = rankIndex === 7;
         const isLegal = legalMoveSet.has(square);
-
-        const squareStyle: CSSProperties = {
-          position: 'relative',
-          backgroundColor: overlay ?? background,
-          cursor: onSquareClick ? 'pointer' : 'default',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          userSelect: 'none',
-          border: 'none',
-          padding: 0,
-        };
+        const isCaptureTarget = isLegal && Boolean(piece);
 
         return (
           <button
             key={square}
             type="button"
-            style={squareStyle}
+            className={cn(
+              'chess-square',
+              darkSquare ? 'is-dark' : 'is-light',
+              onSquareClick && 'is-clickable',
+              onSquareClick && 'is-hoverable',
+              square === selectedSquare && 'is-selected',
+              lastMoveSet.has(square) && 'is-last-move',
+              square === checkSquare && 'is-check',
+              square === dragOverSquare && 'is-drag-over',
+            )}
+            style={{
+              ['--square-base' as string]: darkSquare ? 'var(--dark-square)' : 'var(--light-square)',
+            }}
             onClick={() => onSquareClick?.(square)}
             aria-label={`Square ${square}`}
             onDragOver={(event) => {
@@ -183,6 +126,11 @@ export const ChessBoard = ({
             {piece ? (
               <span
                 draggable={draggingEnabled}
+                className={cn(
+                  'piece-wrap',
+                  draggingEnabled && 'is-draggable',
+                  draggedSquare === square && 'is-dragging',
+                )}
                 onDragStart={(event) => {
                   if (!draggingEnabled) {
                     return;
@@ -193,70 +141,30 @@ export const ChessBoard = ({
                   onPieceDragStart?.(square);
                 }}
                 onDragEnd={() => onPieceDragEnd?.()}
-                style={{
-                  width: `${pieceSizeRatio * 100}%`,
-                  height: `${pieceSizeRatio * 100}%`,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: draggedSquare === square ? 0.25 : 1,
-                  cursor: draggingEnabled ? 'grab' : 'inherit',
-                }}
               >
                 <ChessPiece
                   type={piece.type}
                   color={piece.color}
                   size="100%"
                   ghost={draggedSquare === square}
+                  selected={square === selectedSquare}
                   title={`${piece.color}-${piece.type}`}
                 />
               </span>
             ) : null}
 
             {isLegal ? (
-              <span
-                style={{
-                  position: 'absolute',
-                  width: piece ? '70%' : '26%',
-                  height: piece ? '70%' : '26%',
-                  border: piece ? `4px solid ${LEGAL_MOVE_DOT}` : undefined,
-                  borderRadius: '50%',
-                  background: piece ? 'transparent' : LEGAL_MOVE_DOT,
-                  pointerEvents: 'none',
-                }}
-              />
+              <span className={cn('legal-indicator', isCaptureTarget ? 'capture' : 'dot')} />
             ) : null}
 
             {showRankLabel ? (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: 4,
-                  left: 5,
-                  color: labelColor,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  pointerEvents: 'none',
-                }}
-              >
+              <span className={cn('coord-label rank', darkSquare ? 'on-dark' : 'on-light')}>
                 {rank}
               </span>
             ) : null}
 
             {showFileLabel ? (
-              <span
-                style={{
-                  position: 'absolute',
-                  bottom: 4,
-                  right: 5,
-                  color: labelColor,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  pointerEvents: 'none',
-                }}
-              >
+              <span className={cn('coord-label file', darkSquare ? 'on-dark' : 'on-light')}>
                 {file}
               </span>
             ) : null}

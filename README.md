@@ -24,6 +24,16 @@ A modular chess UI foundation with:
   - check square
 - Uses only custom SVG pieces (no Unicode).
 
+
+### UI polish
+- Smooth hover response on squares with subtle brightness/ring feedback.
+- Stronger selected square treatment while keeping pieces visually primary.
+- Legal move indicators use:
+  - center dots for quiet moves
+  - outer rings for captures
+- Refined last-move and check highlights with better contrast hierarchy.
+- Subtle transition timing for square/piece state changes (no heavy animation).
+
 ### Interactive controller
 - `useChessGame` + `InteractiveChessBoard` integrate `chess.js` for rules/state.
 - Supports both interaction models:
