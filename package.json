@@ -1,0 +1,9 @@
+{
+  "name": "chess-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Chess UI components with custom SVG pieces, FEN board rendering, and interactive click-to-move controller.",
+  "dependencies": {
+    "chess.js": "^1.4.0"
+  }
+}
