@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChessBoard } from '../board';
 import type { ChessBoardWithControlsProps } from './types';
 import { useChessGame } from './useChessGame';
@@ -42,6 +42,7 @@ export const ChessBoardWithControls = ({
   showMoveList = true,
 }: ChessBoardWithControlsProps): JSX.Element => {
   const controller = useChessGame({ initialFen, orientation, onMove });
+  const { redoMove, undoMove } = controller;
   const [fenInput, setFenInput] = useState(controller.fen);
   const [fenError, setFenError] = useState<string | null>(null);
   const [currentOrientation, setCurrentOrientation] = useState(orientation);
@@ -58,6 +59,40 @@ export const ChessBoardWithControls = ({
 
     return rows;
   }, [controller.movesSan]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const isTypingTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+
+      const tag = target.tagName.toLowerCase();
+      return tag === 'input' || tag === 'textarea' || target.isContentEditable;
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) {
+        return;
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        undoMove();
+      }
+
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        redoMove();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [redoMove, undoMove]);
 
   return (
     <section className={`chess-shell ${className ?? ''}`.trim()}>
