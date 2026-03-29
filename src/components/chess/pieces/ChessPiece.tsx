@@ -54,6 +54,7 @@ export const ChessPiece = ({
       alt={title ?? `${color === 'w' ? 'white' : 'black'} ${type}`}
       className={className}
       style={style}
+      draggable={false}
     />
   );
 };
