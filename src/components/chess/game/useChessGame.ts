@@ -191,34 +191,31 @@ export const useChessGame = ({
   }, [syncState]);
 
   const redoMove = useCallback(() => {
-    const redoFen = redoFenStackRef.current.pop();
-    if (!redoFen) {
-      return;
-    }
+  const redoFen = redoFenStackRef.current.pop();
+  if (!redoFen) {
+    return;
+  }
 
-    const loaded = gameRef.current.load(redoFen);
-    if (!loaded) {
-      return;
-    }
+  gameRef.current.load(redoFen);
 
-    const history = gameRef.current.history({ verbose: true }) as ChessMove[];
-    const latest = history.at(-1);
-    syncState(latest ? { from: asSquare(latest.from), to: asSquare(latest.to) } : null);
-  }, [syncState]);
+  const history = gameRef.current.history({ verbose: true }) as ChessMove[];
+  const latest = history.at(-1);
+  syncState(latest ? { from: asSquare(latest.from), to: asSquare(latest.to) } : null);
+}, [syncState]);
 
   const loadFen = useCallback(
-    (fen: string): boolean => {
-      const loaded = gameRef.current.load(fen.trim());
-      if (!loaded) {
-        return false;
-      }
-
+  (fen: string): boolean => {
+    try {
+      gameRef.current.load(fen.trim());
       redoFenStackRef.current = [];
       syncState(null);
       return true;
-    },
-    [syncState],
-  );
+    } catch {
+      return false;
+    }
+  },
+  [syncState],
+);
 
   const reset = useCallback(
     (fen: string = initialFen) => {
