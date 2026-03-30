@@ -1,8 +1,9 @@
 import type { JSX } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChessBoard } from '../board';
 import type { ChessBoardWithControlsProps } from './types';
-import { useStockfishBestMove } from './useStockfishBestMove';
+import { EvaluationBar } from './EvaluationBar';
+import { useStockfishAnalysis } from './useStockfishAnalysis';
 import { useChessGame } from './useChessGame';
 import './ChessBoardWithControls.css';
 
@@ -13,6 +14,14 @@ type ChessComGame = {
   end_time?: number;
   white?: { username?: string; rating?: number; result?: string };
   black?: { username?: string; rating?: number; result?: string };
+};
+
+type ChessComArchivesResponse = {
+  archives?: string[];
+};
+
+type ChessComGamesResponse = {
+  games?: ChessComGame[];
 };
 
 const turnText = (turn: 'w' | 'b'): string => (turn === 'w' ? 'White to move' : 'Black to move');
@@ -79,7 +88,9 @@ export const ChessBoardWithControls = ({
   const [games, setGames] = useState<ChessComGame[]>([]);
   const [selectedGameUrl, setSelectedGameUrl] = useState('');
   const [loadingGames, setLoadingGames] = useState(false);
-  const bestMoveArrow = useStockfishBestMove(controller.fen, showBestMove);
+  const analysis = useStockfishAnalysis(controller.fen, showBestMove);
+  const analysisView = showBestMove ? analysis : null;
+  const bestMoveArrow = analysisView?.bestMove ?? null;
 
   const groupedMoves = useMemo(() => {
     const rows: string[] = [];
@@ -94,7 +105,7 @@ export const ChessBoardWithControls = ({
     return rows;
   }, [controller.movesSan]);
 
-  const loadChessComGames = async () => {
+  const loadChessComGames = useCallback(async () => {
     const normalizedUsername = chessComUsername.trim().toLowerCase();
     if (!normalizedUsername) {
       setFetchError('Enter a Chess.com username.');
@@ -110,7 +121,7 @@ export const ChessBoardWithControls = ({
         throw new Error('Could not find archives for that player.');
       }
 
-      const archiveData = (await archiveResponse.json()) as { archives?: string[] };
+      const archiveData = (await archiveResponse.json()) as ChessComArchivesResponse;
       const archives = archiveData.archives ?? [];
       if (!archives.length) {
         setGames([]);
@@ -127,7 +138,7 @@ export const ChessBoardWithControls = ({
             return [] as ChessComGame[];
           }
 
-          const data = (await response.json()) as { games?: ChessComGame[] };
+          const data = (await response.json()) as ChessComGamesResponse;
           return data.games ?? [];
         }),
       );
@@ -151,7 +162,7 @@ export const ChessBoardWithControls = ({
     } finally {
       setLoadingGames(false);
     }
-  };
+  }, [chessComUsername]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -234,23 +245,32 @@ export const ChessBoardWithControls = ({
       </div>
 
       <div className="chess-layout">
-        <ChessBoard
-          fen={controller.fen}
-          orientation={currentOrientation}
-          onSquareClick={controller.onSquareClick}
-          selectedSquare={controller.selectedSquare}
-          legalMoves={controller.legalMoves}
-          lastMove={controller.lastMove}
-          checkSquare={controller.checkSquare}
-          draggedSquare={controller.draggedSquare}
-          dragOverSquare={controller.dragOverSquare}
-          onPieceDragStart={controller.onPieceDragStart}
-          onPieceDragEnter={controller.onPieceDragEnter}
-          onPieceDrop={controller.onPieceDrop}
-          onPieceDragEnd={controller.onPieceDragEnd}
-          pieceSizeRatio={pieceSizeRatio}
-          bestMoveArrow={bestMoveArrow}
-        />
+        <div className="board-analysis-stack">
+          <EvaluationBar
+            evaluation={analysisView?.evaluation ?? null}
+            depth={analysisView?.depth ?? 0}
+            isAnalyzing={analysisView?.isAnalyzing ?? false}
+            error={analysisView?.error ?? null}
+            className="board-evalbar"
+          />
+          <ChessBoard
+            fen={controller.fen}
+            orientation={currentOrientation}
+            onSquareClick={controller.onSquareClick}
+            selectedSquare={controller.selectedSquare}
+            legalMoves={controller.legalMoves}
+            lastMove={controller.lastMove}
+            checkSquare={controller.checkSquare}
+            draggedSquare={controller.draggedSquare}
+            dragOverSquare={controller.dragOverSquare}
+            onPieceDragStart={controller.onPieceDragStart}
+            onPieceDragEnter={controller.onPieceDragEnter}
+            onPieceDrop={controller.onPieceDrop}
+            onPieceDragEnd={controller.onPieceDragEnd}
+            pieceSizeRatio={pieceSizeRatio}
+            bestMoveArrow={bestMoveArrow}
+          />
+        </div>
 
         <aside className="chess-sidepanel">
           <div className="fen-row">
@@ -314,7 +334,6 @@ export const ChessBoardWithControls = ({
               />
               <span>Show best move</span>
             </label>
-
             <label htmlFor="fen-input">Load FEN</label>
             <input
               id="fen-input"

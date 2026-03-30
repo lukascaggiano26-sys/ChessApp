@@ -229,16 +229,58 @@ export const useChessGame = ({
 
   const loadFen = useCallback(
     (fen: string): boolean => {
+      const loaded = gameRef.current.load(fen.trim());
+      if (!loaded) {
+        return false;
+      }
+
+      resetTimeline(gameRef.current.fen());
+      syncState(null);
+      return true;
+    },
+    [resetTimeline, syncState],
+  );
+
+  const loadPgn = useCallback(
+    (pgn: string): boolean => {
       try {
-        gameRef.current.load(fen.trim());
-        resetTimeline(gameRef.current.fen());
+        const startingFen = parseFenHeaderFromPgn(pgn) ?? START_FEN;
+        const validator = new Chess(startingFen);
+        validator.loadPgn(pgn);
+
+        const replayGame = new Chess(startingFen);
+        const verboseMoves = validator.history({ verbose: true });
+        const fens: string[] = [replayGame.fen()];
+        const lastMoves: Array<LastMove | null> = [null];
+
+        for (const move of verboseMoves) {
+          if (typeof move === 'string') {
+            continue;
+          }
+
+          const appliedMove = replayGame.move(move.san);
+          if (!appliedMove) {
+            return false;
+          }
+
+          fens.push(replayGame.fen());
+          lastMoves.push({ from: asSquare(appliedMove.from), to: asSquare(appliedMove.to) });
+        }
+
+        gameRef.current = new Chess(fens[0]) as unknown as ChessInstance;
+        timelineRef.current = {
+          fens,
+          lastMoves,
+          currentIndex: 0,
+        };
+
         syncState(null);
         return true;
       } catch {
         return false;
       }
     },
-    [resetTimeline, syncState],
+    [syncState],
   );
 
   const loadPgn = useCallback(
