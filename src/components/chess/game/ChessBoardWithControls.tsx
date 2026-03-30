@@ -238,6 +238,7 @@ export const ChessBoardWithControls = ({
         <div className="board-analysis-stack">
           <EvaluationBar
             evaluation={stableEvaluation}
+            perspective={displayPerspective}
             depth={analysis.depth}
             isAnalyzing={analysis.isAnalyzing}
             error={analysis.error}
