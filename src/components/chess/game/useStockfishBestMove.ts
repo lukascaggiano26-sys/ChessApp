@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { LastMove, Square } from '../board';
+import stockfishUrl from 'stockfish/src/stockfish-nnue-16-single.js?url';
 
-const STOCKFISH_18_WORKER_URL =
-  'https://unpkg.com/stockfish@18.0.0/bin/stockfish-18-lite-single.js';
 const SEARCH_DEPTH = 15;
 const EVAL_TIMEOUT_MS = 5000;
 
@@ -11,7 +10,6 @@ const parseBestMove = (line: string): LastMove | null => {
   if (!match) {
     return null;
   }
-
   const uci = match[1];
   return {
     from: uci.slice(0, 2) as Square,
@@ -27,13 +25,12 @@ export const useStockfishBestMove = (fen: string, enabled: boolean): LastMove | 
       setBestMove(null);
       return;
     }
-
     if (typeof window === 'undefined' || typeof Worker === 'undefined') {
       setBestMove(null);
       return;
     }
 
-    const worker = new Worker(STOCKFISH_18_WORKER_URL);
+    const worker = new Worker(stockfishUrl, { type: 'classic' });
     let finished = false;
 
     const timeoutId = window.setTimeout(() => {
@@ -49,7 +46,6 @@ export const useStockfishBestMove = (fen: string, enabled: boolean): LastMove | 
       if (!nextBestMove) {
         return;
       }
-
       finished = true;
       window.clearTimeout(timeoutId);
       setBestMove(nextBestMove);
