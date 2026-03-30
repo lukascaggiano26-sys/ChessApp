@@ -51,11 +51,17 @@ export const EvaluationBar = ({
           aria-valuenow={Math.round(fillPercent)}
           style={{ ['--white-fill' as string]: `${fillPercent}%` }}
         >
-          <div
-            className="evalbar-black"
-            style={{ height: `${100 - fillPercent}%` }}
-          />
-          <div className="evalbar-white" style={{ height: `${fillPercent}%` }} />
+          {perspective === 'black' ? (
+            <>
+              <div className="evalbar-white" style={{ height: `${fillPercent}%` }} />
+              <div className="evalbar-black" style={{ height: `${100 - fillPercent}%` }} />
+            </>
+          ) : (
+            <>
+              <div className="evalbar-black" style={{ height: `${100 - fillPercent}%` }} />
+              <div className="evalbar-white" style={{ height: `${fillPercent}%` }} />
+            </>
+          )}
         </div>
       </div>
 
