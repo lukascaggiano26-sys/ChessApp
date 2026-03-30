@@ -36,6 +36,7 @@ const asNonNegative = (value: number): number => (value < 0 ? 0 : value);
 export const classifyBaseMoveByExpectedPointsLoss = (
   expectedPointsLoss: number | null,
   thresholds: BaseClassificationThresholds = DEFAULT_THRESHOLDS,
+  isBestMove = false,
 ): BaseClassificationResult => {
   if (expectedPointsLoss === null || Number.isNaN(expectedPointsLoss)) {
     return {
@@ -52,7 +53,8 @@ export const classifyBaseMoveByExpectedPointsLoss = (
 
   const loss = asNonNegative(expectedPointsLoss);
 
-  if (Math.abs(loss) <= EPSILON) {
+  // Only label as Best if the played move is literally the engine's top choice
+  if (isBestMove) {
     return {
       label: 'Best',
       explanation: {
@@ -65,6 +67,7 @@ export const classifyBaseMoveByExpectedPointsLoss = (
     };
   }
 
+  // Remove the old epsilon check for Best — fall through to Excellent instead
   if (loss <= thresholds.excellentUpper + EPSILON) {
     return {
       label: 'Excellent',
