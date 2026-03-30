@@ -237,6 +237,86 @@
   font-size: 13px;
 }
 
+.move-review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.move-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.move-filter-row .fen-input {
+  max-width: 140px;
+}
+
+.move-list--review {
+  list-style: none;
+  padding-left: 0;
+}
+
+.move-row {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.move-number {
+  color: #6b7280;
+  min-width: 24px;
+}
+
+.move-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.move-label-badge {
+  border-radius: 9999px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.move-label-badge--brilliant { background: #e0f2fe; color: #075985; }
+.move-label-badge--great { background: #dcfce7; color: #166534; }
+.move-label-badge--best { background: #f3f4f6; color: #111827; }
+.move-label-badge--excellent { background: #ecfeff; color: #0e7490; }
+.move-label-badge--good { background: #f0fdf4; color: #15803d; }
+.move-label-badge--book { background: #eef2ff; color: #3730a3; }
+.move-label-badge--inaccuracy { background: #fffbeb; color: #92400e; }
+.move-label-badge--mistake { background: #fff7ed; color: #9a3412; }
+.move-label-badge--miss { background: #fef2f2; color: #b91c1c; }
+.move-label-badge--blunder { background: #fee2e2; color: #991b1b; }
+
+.move-label-placeholder {
+  color: #9ca3af;
+}
+
+.review-debug-panel {
+  margin-top: 8px;
+  border: 1px dashed rgba(31, 41, 55, 0.25);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.review-debug-panel pre {
+  margin: 6px 0 0;
+  max-height: 200px;
+  overflow: auto;
+  font-size: 11px;
+}
+
 @media (max-width: 900px) {
   .chess-layout {
     grid-template-columns: 1fr;
@@ -296,5 +376,9 @@
 
   .move-list {
     max-height: 220px;
+  }
+
+  .move-row {
+    grid-template-columns: auto 1fr;
   }
 }

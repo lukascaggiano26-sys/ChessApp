@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Chess } from 'chess.js';
 import { ChessBoard } from '../board';
 import type { ChessBoardWithControlsProps } from './types';
 import {
@@ -12,6 +13,8 @@ import {
 } from './chessComUtils';
 import { EvaluationBar } from './EvaluationBar';
 import { getMaterialBalanceFromFen } from './materialBalance';
+import type { MoveReviewReport, ReviewMove } from './moveReview';
+import { buildMoveReviewFromHistory } from './useMoveReview';
 import { useStockfishAnalysis } from './useStockfishAnalysis';
 import { useChessGame } from './useChessGame';
 import './ChessBoardWithControls.css';
@@ -37,8 +40,14 @@ export const ChessBoardWithControls = ({
   const [selectedGameUrl, setSelectedGameUrl] = useState('');
   const [loadingGames, setLoadingGames] = useState(false);
   const [activeGame, setActiveGame] = useState<ChessComGame | null>(null);
+  const [moveReview, setMoveReview] = useState<MoveReviewReport | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewSideFilter, setReviewSideFilter] = useState<'both' | 'white' | 'black'>('both');
+  const [reviewDebugMode, setReviewDebugMode] = useState(false);
   const analysis = useStockfishAnalysis(controller.fen, true);
   const bestMoveArrow = showBestMove ? analysis.bestMove : null;
+  const reviewRequestIdRef = useRef(0);
   
   const lastEvaluationRef = useRef<StockfishEvaluation | null>(null);
   const stableEvaluation = analysis.evaluation ?? lastEvaluationRef.current;
@@ -51,17 +60,42 @@ export const ChessBoardWithControls = ({
   }, [orientation]);
 
   const groupedMoves = useMemo(() => {
-    const rows: string[] = [];
+    const rows: Array<{ moveNumber: number; white: ReviewMove | null; black: ReviewMove | null }> = [];
+    const reviewMoves = moveReview?.moves ?? [];
 
     for (let i = 0; i < controller.movesSan.length; i += 2) {
       const moveNumber = i / 2 + 1;
-      const whiteMove = controller.movesSan[i] ?? '';
-      const blackMove = controller.movesSan[i + 1] ?? '';
-      rows.push(`${moveNumber}. ${whiteMove}${blackMove ? ` ${blackMove}` : ''}`);
+      rows.push({
+        moveNumber,
+        white: reviewMoves[i] ?? null,
+        black: reviewMoves[i + 1] ?? null,
+      });
     }
 
     return rows;
-  }, [controller.movesSan]);
+  }, [controller.movesSan, moveReview]);
+
+  const materialBalance = useMemo(() => getMaterialBalanceFromFen(controller.fen, 'white'), [controller.fen]);
+  const materialLeader: 'white' | 'black' | null =
+    materialBalance.whiteMinusBlack === 0 ? null : materialBalance.whiteMinusBlack > 0 ? 'white' : 'black';
+  const materialLead = Math.abs(materialBalance.whiteMinusBlack);
+
+  const playerInfo = useMemo(
+    () => ({
+      white: {
+        name: activeGame?.white?.username?.trim() || 'White',
+        rating: activeGame?.white?.rating ?? null,
+      },
+      black: {
+        name: activeGame?.black?.username?.trim() || 'Black',
+        rating: activeGame?.black?.rating ?? null,
+      },
+    }),
+    [activeGame],
+  );
+
+  const topSide = displayPerspective === 'white' ? 'black' : 'white';
+  const bottomSide = displayPerspective;
 
   const materialBalance = useMemo(() => getMaterialBalanceFromFen(controller.fen, 'white'), [controller.fen]);
   const materialLeader: 'white' | 'black' | null =
@@ -144,6 +178,91 @@ export const ChessBoardWithControls = ({
     }
   }, [chessComUsername]);
 
+  const runMoveReview = useCallback(async () => {
+    if (!controller.movesSan.length) {
+      setMoveReview(null);
+      return;
+    }
+
+    setReviewLoading(true);
+    setReviewError(null);
+    const requestId = reviewRequestIdRef.current + 1;
+    reviewRequestIdRef.current = requestId;
+
+    try {
+      const replay = new Chess(controller.startingFen);
+      const history = controller.movesSan
+        .map((san) => {
+          const move = replay.move(san, { strict: false });
+          if (!move) {
+            return null;
+          }
+          return { from: String(move.from), to: String(move.to) };
+        })
+        .filter(Boolean) as Array<{ from: string; to: string }>;
+
+      if (history.length !== controller.movesSan.length) {
+        throw new Error('Unable to parse move history for review.');
+      }
+
+      const report = await buildMoveReviewFromHistory({
+        startingFen: controller.startingFen,
+        history,
+        playerRatings: {
+          white: activeGame?.white?.rating,
+          black: activeGame?.black?.rating,
+        },
+        debugMode: reviewDebugMode,
+      });
+      if (reviewRequestIdRef.current !== requestId) {
+        return;
+      }
+      setMoveReview(report);
+      if (reviewDebugMode && typeof console !== 'undefined' && report.debugRows) {
+        console.table(
+          report.debugRows.map((row) => ({
+            ply: row.plyIndex + 1,
+            side: row.playedBy,
+            final: row.finalLabel,
+            base: row.baseLabel,
+            epLoss: row.expectedPointsLoss,
+            cpLoss: row.centipawnLoss,
+            best: row.bestMoveUci,
+            book: row.checks.isBook,
+            brilliant: row.checks.isBrilliant,
+            great: row.checks.isGreat,
+            miss: row.checks.isMiss,
+          })),
+        );
+      }
+    } catch {
+      if (reviewRequestIdRef.current !== requestId) {
+        return;
+      }
+      setReviewError('Move review failed.');
+    } finally {
+      if (reviewRequestIdRef.current === requestId) {
+        setReviewLoading(false);
+      }
+    }
+  }, [
+    activeGame?.black?.rating,
+    activeGame?.white?.rating,
+    controller.movesSan,
+    controller.startingFen,
+    reviewDebugMode,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const fromQuery = new URLSearchParams(window.location.search).get('reviewDebug') === '1';
+    const fromStorage = window.localStorage.getItem('reviewDebugMode') === '1';
+    setReviewDebugMode(fromQuery || fromStorage);
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -187,6 +306,8 @@ export const ChessBoardWithControls = ({
           onClick={() => {
             controller.newGame();
             setActiveGame(null);
+            setMoveReview(null);
+            setReviewError(null);
           }}
         >
           New game
@@ -197,6 +318,8 @@ export const ChessBoardWithControls = ({
           onClick={() => {
             controller.reset(initialFen);
             setActiveGame(null);
+            setMoveReview(null);
+            setReviewError(null);
           }}
         >
           Reset
@@ -331,6 +454,8 @@ export const ChessBoardWithControls = ({
 
                 setFetchError(null);
                 setActiveGame(chosen);
+                setMoveReview(null);
+                setReviewError(null);
                 const searchedPlayerSide = getPlayerSideInGame(chosen, chessComUsername);
                 if (searchedPlayerSide) {
                   setDisplayPerspective(searchedPlayerSide);
@@ -369,6 +494,8 @@ export const ChessBoardWithControls = ({
 
                 setFenError(null);
                 setActiveGame(null);
+                setMoveReview(null);
+                setReviewError(null);
               }}
             >
               Load
@@ -379,12 +506,71 @@ export const ChessBoardWithControls = ({
 
           {showMoveList ? (
             <>
-              <h4>Moves</h4>
-              <ol className="move-list">
-                {groupedMoves.map((move) => (
-                  <li key={move}>{move}</li>
+              <div className="move-review-header">
+                <h4>Moves</h4>
+                <button type="button" className="chess-btn" onClick={runMoveReview} disabled={reviewLoading}>
+                  {reviewLoading ? 'Reviewing…' : 'Review labels'}
+                </button>
+              </div>
+              <div className="move-filter-row">
+                <label htmlFor="move-filter-side">Show:</label>
+                <select
+                  id="move-filter-side"
+                  className="fen-input"
+                  value={reviewSideFilter}
+                  onChange={(event) => setReviewSideFilter(event.target.value as 'both' | 'white' | 'black')}
+                >
+                  <option value="both">Both</option>
+                  <option value="white">White</option>
+                  <option value="black">Black</option>
+                </select>
+              </div>
+              {reviewError ? <small>{reviewError}</small> : null}
+              <ol className="move-list move-list--review">
+                {groupedMoves.map((row) => (
+                  <li key={row.moveNumber} className="move-row">
+                    <span className="move-number">{row.moveNumber}.</span>
+                    {reviewSideFilter !== 'black' ? (
+                      <span className="move-entry">
+                        <span>{row.white?.san ?? controller.movesSan[(row.moveNumber - 1) * 2] ?? '--'}</span>
+                        {row.white?.moveLabel ? (
+                          <span
+                            className={`move-label-badge move-label-badge--${row.white.moveLabel.toLowerCase()}`}
+                            title={row.white.labelExplanationSeed ?? row.white.labelReason ?? ''}
+                          >
+                            {row.white.moveLabel}
+                          </span>
+                        ) : moveReview ? (
+                          <span className="move-label-placeholder">—</span>
+                        ) : (
+                          <span className="move-label-placeholder">…</span>
+                        )}
+                      </span>
+                    ) : null}
+                    {reviewSideFilter !== 'white' ? (
+                      <span className="move-entry">
+                        <span>{row.black?.san ?? controller.movesSan[(row.moveNumber - 1) * 2 + 1] ?? '--'}</span>
+                        {row.black?.moveLabel ? (
+                          <span
+                            className={`move-label-badge move-label-badge--${row.black.moveLabel.toLowerCase()}`}
+                            title={row.black.labelExplanationSeed ?? row.black.labelReason ?? ''}
+                          >
+                            {row.black.moveLabel}
+                          </span>
+                        ) : moveReview && controller.movesSan[(row.moveNumber - 1) * 2 + 1] ? (
+                          <span className="move-label-placeholder">—</span>
+                        ) : null}
+                      </span>
+                    ) : null}
+                  </li>
                 ))}
               </ol>
+              {reviewDebugMode && moveReview?.debugRows ? (
+                <details className="review-debug-panel">
+                  <summary>Review debug ({moveReview.debugRows.length} rows)</summary>
+                  <pre>{JSON.stringify(moveReview.debugRows.slice(0, 20), null, 2)}</pre>
+                </details>
+              ) : null}
             </>
           ) : null}
         </aside>

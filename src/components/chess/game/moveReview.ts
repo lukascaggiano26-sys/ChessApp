@@ -1,225 +1,314 @@
-import { Chess } from 'chess.js';
-import type { StockfishEvaluation } from './stockfishAnalysis';
+import {
+  classifyBaseMoveByCentipawnFallback,
+  classifyBaseMoveByExpectedPointsLoss,
+} from './moveReviewBaseLabels';
+import { defaultBookMoveDetector, type BookMoveDetector } from './moveReviewBook';
+import { mergeMoveReviewConfig, DEFAULT_MOVE_REVIEW_CONFIG } from './moveReviewConfig';
+import { DEFAULT_MOVE_REVIEW_CALIBRATION_CONFIG } from './moveReviewCalibrationConfig';
+import { resolveMoveLabel } from './moveReviewLabelResolver';
+import { detectBrilliantMove, detectGreatMove, detectMiss } from './moveReviewSpecialLabels';
+import {
+  DEFAULT_EXPECTED_POINTS_MODEL_CONFIG,
+  type ExpectedPointsModelConfig,
+  engineEvalToExpectedPoints,
+  evalToWhiteCp,
+  whiteCpToSideCp,
+} from './moveReviewExpectedPoints';
+import { applyUciMoveToFen, traverseGameMoves } from './moveReviewTraversal';
+import type {
+  MoveReviewConfig,
+  MoveReviewLabel,
+  MoveReviewReport,
+  MoveReviewDebugRow,
+  PlayerRatings,
+  PositionAnalyzer,
+  ReviewMoveInput,
+  ReviewSummary,
+} from './moveReviewTypes';
 
 /**
- * Internal move-review approximation layer.
+ * Move-review foundation.
  *
- * This module intentionally does not attempt to replicate Chess.com's proprietary
- * CAPS / expected-points implementation exactly.
+ * IMPORTANT:
+ * - Uses publicly-known concepts (engine deltas / expected-points style ideas).
+ * - Does NOT claim exact Chess.com algorithmic equivalence where formulas are undisclosed.
  */
-
-export type MoveReviewLabel = 'best' | 'excellent' | 'good' | 'inaccuracy' | 'mistake' | 'blunder' | 'miss';
-
-export interface MoveReviewThresholds {
-  excellentMaxCpLoss: number;
-  goodMaxCpLoss: number;
-  inaccuracyMaxCpLoss: number;
-  mistakeMaxCpLoss: number;
-  blunderMaxCpLoss: number;
-  missExpectedPointsLoss: number;
-}
-
-export interface MoveReviewConfig {
-  thresholds: MoveReviewThresholds;
-  mateCpEquivalent: number;
-}
-
-export interface PositionAnalysis {
-  bestMoveUci: string | null;
-  evaluation: StockfishEvaluation | null;
-}
-
-export interface PositionAnalyzer {
-  analyzePosition: (fen: string) => Promise<PositionAnalysis>;
-}
-
-export interface MoveReviewPly {
-  ply: number;
-  sideToMove: 'w' | 'b';
-  fenBefore: string;
-  playedMoveUci: string;
-  bestMoveUci: string | null;
-  fenAfterPlayed: string;
-  fenAfterBest: string | null;
-  evalBefore: StockfishEvaluation | null;
-  evalAfterPlayed: StockfishEvaluation | null;
-  evalAfterBest: StockfishEvaluation | null;
-  centipawnLoss: number | null;
-  expectedPointsLoss: number | null;
-  label: MoveReviewLabel | null;
-}
-
-export interface MoveReviewReport {
-  config: MoveReviewConfig;
-  plies: MoveReviewPly[];
-}
-
-const MATE_EVAL_SENTINEL = 50;
-
-export const DEFAULT_MOVE_REVIEW_CONFIG: MoveReviewConfig = {
-  thresholds: {
-    excellentMaxCpLoss: 10,
-    goodMaxCpLoss: 40,
-    inaccuracyMaxCpLoss: 90,
-    mistakeMaxCpLoss: 200,
-    blunderMaxCpLoss: 500,
-    missExpectedPointsLoss: 0.2,
-  },
-  mateCpEquivalent: 1000,
-};
-
-const logisticExpectedPoints = (cp: number): number => 1 / (1 + Math.exp(-cp / 120));
-
-const evaluationToCp = (evaluation: StockfishEvaluation | null, mateCpEquivalent: number): number | null => {
-  if (!evaluation) {
-    return null;
-  }
-
-  if (evaluation.type === 'cp') {
-    return evaluation.value;
-  }
-
-  if (evaluation.value === 0) {
-    return 0;
-  }
-
-  const sign = Math.sign(evaluation.value);
-  const mateDistance = Math.max(1, Math.abs(evaluation.value));
-  const dampenedBonus = Math.max(0, MATE_EVAL_SENTINEL - mateDistance) * 10;
-  return sign * (mateCpEquivalent + dampenedBonus);
-};
-
-const toMoverPerspective = (whiteCp: number, sideToMove: 'w' | 'b'): number =>
-  sideToMove === 'w' ? whiteCp : -whiteCp;
-
-const classifyMove = (
-  centipawnLoss: number | null,
-  expectedPointsLoss: number | null,
-  config: MoveReviewConfig,
-): MoveReviewLabel | null => {
-  if (centipawnLoss === null) {
-    return null;
-  }
-
-  if ((expectedPointsLoss ?? 0) >= config.thresholds.missExpectedPointsLoss) {
-    return 'miss';
-  }
-
-  if (centipawnLoss <= 0) {
-    return 'best';
-  }
-  if (centipawnLoss <= config.thresholds.excellentMaxCpLoss) {
-    return 'excellent';
-  }
-  if (centipawnLoss <= config.thresholds.goodMaxCpLoss) {
-    return 'good';
-  }
-  if (centipawnLoss <= config.thresholds.inaccuracyMaxCpLoss) {
-    return 'inaccuracy';
-  }
-  if (centipawnLoss <= config.thresholds.mistakeMaxCpLoss) {
-    return 'mistake';
-  }
-  if (centipawnLoss <= config.thresholds.blunderMaxCpLoss) {
-    return 'blunder';
-  }
-
-  return 'blunder';
-};
-
-const mergeConfig = (config?: Partial<MoveReviewConfig>): MoveReviewConfig => ({
-  thresholds: {
-    ...DEFAULT_MOVE_REVIEW_CONFIG.thresholds,
-    ...(config?.thresholds ?? {}),
-  },
-  mateCpEquivalent: config?.mateCpEquivalent ?? DEFAULT_MOVE_REVIEW_CONFIG.mateCpEquivalent,
-});
-
-const verboseMoveToUci = (move: { from: string; to: string; promotion?: string }): string =>
-  `${move.from}${move.to}${move.promotion ?? ''}`;
-
-const applyUciMoveToFen = (fen: string, uciMove: string): string | null => {
-  const game = new Chess(fen);
-  const from = uciMove.slice(0, 2);
-  const to = uciMove.slice(2, 4);
-  const promotion = uciMove.length > 4 ? uciMove.slice(4, 5) : undefined;
-  const result = game.move({ from, to, promotion });
-  if (!result) {
-    return null;
-  }
-
-  return game.fen();
-};
-
 export const buildMoveReviewReport = async ({
   startingFen,
   moves,
   analyzer,
   config,
+  playerRatings,
+  bookMoveDetector,
+  expectedPointsModelConfig,
+  debugMode = false,
 }: {
   startingFen: string;
-  moves: Array<{ from: string; to: string; promotion?: string }>;
+  moves: ReviewMoveInput[];
   analyzer: PositionAnalyzer;
   config?: Partial<MoveReviewConfig>;
+  playerRatings?: PlayerRatings;
+  bookMoveDetector?: BookMoveDetector;
+  expectedPointsModelConfig?: Partial<ExpectedPointsModelConfig>;
+  debugMode?: boolean;
 }): Promise<MoveReviewReport> => {
-  const mergedConfig = mergeConfig(config);
-  const replay = new Chess(startingFen);
-  const plies: MoveReviewPly[] = [];
+  const mergedConfig = mergeMoveReviewConfig({
+    ...DEFAULT_MOVE_REVIEW_CALIBRATION_CONFIG.reviewConfig,
+    ...config,
+  });
+  const mergedExpectedPointsModelConfig: ExpectedPointsModelConfig = {
+    ...DEFAULT_MOVE_REVIEW_CALIBRATION_CONFIG.expectedPointsModelConfig,
+    ...DEFAULT_EXPECTED_POINTS_MODEL_CONFIG,
+    ...(expectedPointsModelConfig ?? {}),
+  };
+  const detector = bookMoveDetector ?? defaultBookMoveDetector;
+  const traversed = traverseGameMoves(startingFen, moves);
+  const analysisCache = new Map<string, Awaited<ReturnType<PositionAnalyzer['analyzePosition']>>>();
 
-  for (const [index, move] of moves.entries()) {
-    const fenBefore = replay.fen();
-    const sideToMove = replay.turn();
-    const playedMoveUci = verboseMoveToUci(move);
+  const reviewedMoves = [] as MoveReviewReport['moves'];
+  const debugRows: MoveReviewDebugRow[] = [];
 
-    const before = await analyzer.analyzePosition(fenBefore);
-
-    const playedResult = replay.move({ from: move.from, to: move.to, promotion: move.promotion });
-    if (!playedResult) {
-      break;
+  const analyzeWithCache = async (fen: string) => {
+    const cached = analysisCache.get(fen);
+    if (cached) {
+      return cached;
     }
 
-    const fenAfterPlayed = replay.fen();
-    const afterPlayed = await analyzer.analyzePosition(fenAfterPlayed);
+    const analyzed = await analyzer.analyzePosition(fen);
+    analysisCache.set(fen, analyzed);
+    return analyzed;
+  };
 
-    const fenAfterBest = before.bestMoveUci ? applyUciMoveToFen(fenBefore, before.bestMoveUci) : null;
-    const afterBest = fenAfterBest ? await analyzer.analyzePosition(fenAfterBest) : null;
+  for (const ply of traversed) {
+    const before = await analyzeWithCache(ply.fenBefore);
+    const afterPlayed = await analyzeWithCache(ply.fenAfter);
 
-    const afterPlayedCpWhite = evaluationToCp(afterPlayed.evaluation, mergedConfig.mateCpEquivalent);
-    const afterBestCpWhite = evaluationToCp(afterBest?.evaluation ?? null, mergedConfig.mateCpEquivalent);
+    const fenAfterBest = before.bestMoveUci ? applyUciMoveToFen(ply.fenBefore, before.bestMoveUci) : null;
+    const afterBest = fenAfterBest ? await analyzeWithCache(fenAfterBest) : null;
 
-    const afterPlayedCpMover =
-      afterPlayedCpWhite === null ? null : toMoverPerspective(afterPlayedCpWhite, sideToMove);
-    const afterBestCpMover = afterBestCpWhite === null ? null : toMoverPerspective(afterBestCpWhite, sideToMove);
+    const cpBeforeWhite = evalToWhiteCp(before.evaluation, mergedConfig.mateCpEquivalent);
+    const cpAfterPlayedWhite = evalToWhiteCp(afterPlayed.evaluation, mergedConfig.mateCpEquivalent);
+    const cpAfterBestWhite = evalToWhiteCp(afterBest?.evaluation ?? null, mergedConfig.mateCpEquivalent);
+
+    const cpBeforeForMover =
+      cpBeforeWhite === null ? null : whiteCpToSideCp(cpBeforeWhite, ply.playedBy === 'white' ? 'white' : 'black');
+    const cpAfterPlayedForMover =
+      cpAfterPlayedWhite === null
+        ? null
+        : whiteCpToSideCp(cpAfterPlayedWhite, ply.playedBy === 'white' ? 'white' : 'black');
+    const cpAfterBestForMover =
+      cpAfterBestWhite === null
+        ? null
+        : whiteCpToSideCp(cpAfterBestWhite, ply.playedBy === 'white' ? 'white' : 'black');
+
+    const currentPlayerRating =
+      ply.playedBy === 'white'
+        ? playerRatings?.white ?? mergedConfig.defaultPlayerRating
+        : playerRatings?.black ?? mergedConfig.defaultPlayerRating;
+
+    const expectedPointsBefore = engineEvalToExpectedPoints(
+      before.evaluation,
+      currentPlayerRating,
+      ply.playedBy,
+      mergedExpectedPointsModelConfig,
+    );
+    const expectedPointsAfterPlayed = engineEvalToExpectedPoints(
+      afterPlayed.evaluation,
+      currentPlayerRating,
+      ply.playedBy,
+      mergedExpectedPointsModelConfig,
+    );
+    const expectedPointsAfterBest = engineEvalToExpectedPoints(
+      afterBest?.evaluation ?? null,
+      currentPlayerRating,
+      ply.playedBy,
+      mergedExpectedPointsModelConfig,
+    );
 
     const centipawnLoss =
-      afterBestCpMover === null || afterPlayedCpMover === null
+      cpAfterBestForMover === null || cpAfterPlayedForMover === null
         ? null
-        : Math.max(0, afterBestCpMover - afterPlayedCpMover);
+        : Math.max(0, cpAfterBestForMover - cpAfterPlayedForMover);
 
     const expectedPointsLoss =
-      afterBestCpMover === null || afterPlayedCpMover === null
+      expectedPointsAfterBest === null || expectedPointsAfterPlayed === null
         ? null
-        : Math.max(0, logisticExpectedPoints(afterBestCpMover) - logisticExpectedPoints(afterPlayedCpMover));
+        : Math.max(0, expectedPointsAfterBest - expectedPointsAfterPlayed);
 
-    plies.push({
-      ply: index + 1,
-      sideToMove,
-      fenBefore,
-      playedMoveUci,
+    const bookDetection = detector.detectMove({
+      fenBefore: ply.fenBefore,
+      playedMoveUci: ply.uci,
+      plyIndex: ply.plyIndex,
+    });
+    const isBook = bookDetection.isBook;
+
+    const baseClassification =
+      expectedPointsLoss === null
+        ? classifyBaseMoveByCentipawnFallback(centipawnLoss)
+        : classifyBaseMoveByExpectedPointsLoss(expectedPointsLoss);
+    const brilliant = detectBrilliantMove({
+      expectedPointsLoss,
+      centipawnLoss,
+      expectedPointsBefore,
+      expectedPointsAfterPlayed,
+      materialBeforeWhiteMinusBlack: ply.materialBefore.whiteMinusBlack,
+      materialAfterWhiteMinusBlack: ply.materialAfter.whiteMinusBlack,
+      afterPlayedBestLine: afterPlayed.bestLine,
+      fenAfter: ply.fenAfter,
+      playedBy: ply.playedBy,
+      playerRating: currentPlayerRating,
+      config: mergedConfig,
+    });
+    const great = detectGreatMove({
+      expectedPointsBefore,
+      expectedPointsAfterPlayed,
+      expectedPointsAfterBest,
+      expectedPointsLoss,
+      playerRating: currentPlayerRating,
+      config: mergedConfig,
+    });
+    const miss = detectMiss({
+      expectedPointsBefore,
+      expectedPointsAfterPlayed,
+      expectedPointsAfterBest,
+      playerRating: currentPlayerRating,
+      config: mergedConfig,
+    });
+    const labelResolution = resolveMoveLabel({
+      isBook,
+      isBrilliant: brilliant.isBrilliant,
+      isGreat: great.isGreat,
+      isMiss: miss.isMiss,
+      baseLabel: baseClassification.label as MoveReviewLabel | null,
+    });
+
+    reviewedMoves.push({
+      plyIndex: ply.plyIndex,
+      san: ply.san,
+      uci: ply.uci,
+      fenBefore: ply.fenBefore,
+      fenAfter: ply.fenAfter,
+      playedBy: ply.playedBy,
       bestMoveUci: before.bestMoveUci,
-      fenAfterPlayed,
-      fenAfterBest,
+      bestLine: before.bestLine,
       evalBefore: before.evaluation,
       evalAfterPlayed: afterPlayed.evaluation,
       evalAfterBest: afterBest?.evaluation ?? null,
-      centipawnLoss,
+      expectedPointsBefore,
+      expectedPointsAfterPlayed,
+      expectedPointsAfterBest,
       expectedPointsLoss,
-      label: classifyMove(centipawnLoss, expectedPointsLoss, mergedConfig),
+      materialBefore: ply.materialBefore,
+      materialAfter: ply.materialAfter,
+      moveLabel: labelResolution.label,
+      labelReason: labelResolution.reasonCode,
+      labelReasonCode: labelResolution.reasonCode,
+      labelExplanationSeed: labelResolution.explanationSeed,
+      isBook,
+      openingName: bookDetection.openingName,
+      ecoCode: bookDetection.ecoCode,
+      bookSource: bookDetection.bookSource,
+      metadata: {
+        centipawnLoss,
+        cpBeforeForMover,
+        cpAfterPlayedForMover,
+        cpAfterBestForMover,
+        baseClassificationBucket: baseClassification.explanation.bucket,
+        usedCentipawnFallback: baseClassification.explanation.metric === 'centipawnLossFallback',
+        brilliantChecks: brilliant.reasons,
+        greatChecks: great.reasons,
+        missChecks: miss.reasons,
+      },
     });
+
+    if (debugMode) {
+      debugRows.push({
+        plyIndex: ply.plyIndex,
+        san: ply.san,
+        playedBy: ply.playedBy,
+        finalLabel: labelResolution.label,
+        finalReasonCode: labelResolution.reasonCode,
+        baseLabel: baseClassification.label,
+        expectedPointsLoss,
+        centipawnLoss,
+        evalBefore: before.evaluation,
+        evalAfterPlayed: afterPlayed.evaluation,
+        evalAfterBest: afterBest?.evaluation ?? null,
+        bestMoveUci: before.bestMoveUci,
+        checks: {
+          isBook,
+          isBrilliant: brilliant.isBrilliant,
+          isGreat: great.isGreat,
+          isMiss: miss.isMiss,
+        },
+        thresholdsUsed: {
+          ...mergedConfig.thresholds,
+          defaultPlayerRating: mergedConfig.defaultPlayerRating,
+          expectedPointsCpSaturation: mergedExpectedPointsModelConfig.cpSaturation,
+          expectedPointsBaseSteepness: mergedExpectedPointsModelConfig.baseSteepness,
+          expectedPointsRatingExponent: mergedExpectedPointsModelConfig.ratingExponent,
+        },
+      });
+    }
+  }
+
+  const labelCounts: ReviewSummary['labelCounts'] = {
+    Brilliant: 0,
+    Great: 0,
+    Best: 0,
+    Excellent: 0,
+    Good: 0,
+    Book: 0,
+    Inaccuracy: 0,
+    Mistake: 0,
+    Miss: 0,
+    Blunder: 0,
+  };
+
+  for (const move of reviewedMoves) {
+    if (move.moveLabel) {
+      labelCounts[move.moveLabel] += 1;
+    }
   }
 
   return {
     config: mergedConfig,
-    plies,
+    moves: reviewedMoves,
+    summary: {
+      totalPlies: reviewedMoves.length,
+      labelCounts,
+    },
+    ...(debugMode ? { debugRows } : {}),
   };
 };
+
+export { DEFAULT_MOVE_REVIEW_CONFIG };
+export {
+  DEFAULT_EXPECTED_POINTS_MODEL_CONFIG,
+  engineEvalToExpectedPoints,
+} from './moveReviewExpectedPoints';
+export { DEFAULT_MOVE_REVIEW_CALIBRATION_CONFIG } from './moveReviewCalibrationConfig';
+export { defaultBookMoveDetector };
+export { resolveMoveLabel };
+export type { BookDetectionResult, BookMoveContext, BookMoveDetector } from './moveReviewBook';
+export type { MoveLabelResolution, MoveLabelResolutionInput } from './moveReviewLabelResolver';
+export { detectBrilliantMove, detectGreatMove, detectMiss };
+export type { BrilliantDetectionResult, GreatDetectionResult, MissDetectionResult } from './moveReviewSpecialLabels';
+export type { ExpectedPointsModelConfig } from './moveReviewExpectedPoints';
+export type { MoveReviewCalibrationConfig } from './moveReviewCalibrationConfig';
+export type {
+  EngineEval,
+  ExpectedPointsInputs,
+  MaterialSnapshot,
+  MoveLabel,
+  MoveReviewDebugRow,
+  MoveReviewConfig,
+  MoveReviewLabel,
+  MoveReviewPly,
+  MoveReviewReport,
+  PlayerRatings,
+  PositionAnalysis,
+  PositionAnalyzer,
+  ReviewMove,
+  ReviewSummary,
+} from './moveReviewTypes';
