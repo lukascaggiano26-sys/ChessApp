@@ -166,8 +166,16 @@ export interface MoveReviewReport {
 
 export interface MoveReviewDebugRow {
   plyIndex: number;
+  fenBefore: string;
+  playedMoveSan: string;
+  playedMoveUci: string;
   san: string;
   playedBy: ReviewSide;
+  engineQueriedFromFenBefore: boolean;
+  engineBestMoveUciFromFenBefore: string | null;
+  isPlayedMoveIdenticalToBest: boolean;
+  rawExpectedPointsLoss: number | null;
+  rawCentipawnLoss: number | null;
   finalLabel: MoveLabel | null;
   finalReasonCode: string | null;
   baseLabel: MoveLabel | null;
@@ -184,4 +192,9 @@ export interface MoveReviewDebugRow {
     isMiss: boolean;
   };
   thresholdsUsed: Record<string, number | string>;
+  tolerancesUsed: {
+    baseClassificationEpsilon: number;
+    identicalMoveCheck: 'exact-uci-match';
+    clampedLossAtZero: boolean;
+  };
 }
