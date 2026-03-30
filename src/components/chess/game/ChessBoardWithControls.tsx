@@ -230,7 +230,6 @@ export const ChessBoardWithControls = ({
       if (report.moves.length > 0) {
         jumpToPly(report.moves.length);
       }
-      }
       if (reviewDebugMode && typeof console !== 'undefined' && report.debugRows) {
         console.table(
           report.debugRows.map((row) => ({
