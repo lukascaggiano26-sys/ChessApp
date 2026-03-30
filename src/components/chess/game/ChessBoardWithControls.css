@@ -135,18 +135,27 @@
   display: grid;
   justify-items: center;
   gap: 2px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .evalbar-score {
   font-size: 13px;
   line-height: 1;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .evalbar-depth {
   font-size: 11px;
   color: #4b5563;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fen-row {
