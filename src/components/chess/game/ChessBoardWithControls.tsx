@@ -39,7 +39,7 @@ export const ChessBoardWithControls = ({
   showMoveList = true,
 }: ChessBoardWithControlsProps): JSX.Element => {
   const controller = useChessGame({ initialFen, orientation, onMove });
-  const { redoMove, undoMove } = controller;
+  const { redoMove, undoMove, jumpToPly } = controller;
   const [fenInput, setFenInput] = useState(controller.fen);
   const [fenError, setFenError] = useState<string | null>(null);
   const [displayPerspective, setDisplayPerspective] = useState<'white' | 'black'>(orientation);
@@ -227,6 +227,10 @@ export const ChessBoardWithControls = ({
         return;
       }
       setMoveReview(report);
+      if (report.moves.length > 0) {
+        jumpToPly(report.moves.length);
+      }
+      }
       if (reviewDebugMode && typeof console !== 'undefined' && report.debugRows) {
         console.table(
           report.debugRows.map((row) => ({
@@ -259,6 +263,7 @@ export const ChessBoardWithControls = ({
     activeGame?.white?.rating,
     controller.movesSan,
     controller.startingFen,
+    jumpToPly,
     reviewDebugMode,
   ]);
 
