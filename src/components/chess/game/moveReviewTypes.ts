@@ -56,6 +56,8 @@ export interface ReviewMove {
   openingName: string | null;
   ecoCode: string | null;
   bookSource: string | null;
+  openingLine: string[] | null;
+  openingPrefixLength: number | null;
   metadata: {
     centipawnLoss: number | null;
     cpBeforeForMover: number | null;

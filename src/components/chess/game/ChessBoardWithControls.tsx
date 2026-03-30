@@ -309,14 +309,9 @@ export const ChessBoardWithControls = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [redoMove, undoMove]);
 
-  const runMoveReviewRef = useRef(runMoveReview);
   useEffect(() => {
-    runMoveReviewRef.current = runMoveReview;
+    void runMoveReview();
   }, [runMoveReview]);
-  
-  useEffect(() => {
-    void runMoveReviewRef.current();
-  }, [controller.movesSan, controller.startingFen]);
 
   return (
     <section className={`chess-shell ${className ?? ''}`.trim()}>

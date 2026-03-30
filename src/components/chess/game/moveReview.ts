@@ -72,6 +72,7 @@ export const buildMoveReviewReport = async ({
 
   const reviewedMoves = [] as MoveReviewReport['moves'];
   const debugRows: MoveReviewDebugRow[] = [];
+  const sanPrefix: string[] = [];
 
   const analyzeWithCache = async (fen: string) => {
     const cached = analysisCache.get(fen);
@@ -85,6 +86,7 @@ export const buildMoveReviewReport = async ({
   };
 
   for (const ply of traversed) {
+    sanPrefix.push(ply.san);
     const before = await analyzeWithCache(ply.fenBefore);
     const afterPlayed = await analyzeWithCache(ply.fenAfter);
 
@@ -144,18 +146,19 @@ export const buildMoveReviewReport = async ({
     const isPlayedMoveIdenticalToBest = isPlayedMoveEqualToEngineBest(ply.uci, before.bestMoveUci);
 
     const bookDetection = detector.detectMove({
+      startingFen,
       fenBefore: ply.fenBefore,
       playedMoveUci: ply.uci,
+      playedMoveSan: ply.san,
+      movesSanPrefix: [...sanPrefix],
       plyIndex: ply.plyIndex,
     });
     const isBook = bookDetection.isBook;
 
-    const isBestMove = Boolean(before.bestMoveUci && ply.uci === before.bestMoveUci);
-
-    const baseClassification =
+    const baseClassificationRaw =
       expectedPointsLoss === null
         ? classifyBaseMoveByCentipawnFallback(centipawnLoss)
-        : classifyBaseMoveByExpectedPointsLoss(expectedPointsLoss, undefined, isBestMove);
+        : classifyBaseMoveByExpectedPointsLoss(expectedPointsLoss);
     const baseLabel = enforceBestLabelBoundary({
       baseLabel: baseClassificationRaw.label,
       playedUci: ply.uci,
@@ -237,6 +240,8 @@ export const buildMoveReviewReport = async ({
       openingName: bookDetection.openingName,
       ecoCode: bookDetection.ecoCode,
       bookSource: bookDetection.bookSource,
+      openingLine: bookDetection.matchedLine,
+      openingPrefixLength: bookDetection.matchedPrefixLength,
       metadata: {
         centipawnLoss,
         cpBeforeForMover,
@@ -338,6 +343,9 @@ export { DEFAULT_MOVE_REVIEW_CALIBRATION_CONFIG } from './moveReviewCalibrationC
 export { defaultBookMoveDetector };
 export { resolveMoveLabel };
 export type { BookDetectionResult, BookMoveContext, BookMoveDetector } from './moveReviewBook';
+export { createBookMoveDetector } from './moveReviewBook';
+export { staticOpeningLinesProvider } from './openingBookProvider';
+export type { OpeningBookMatch, OpeningBookProvider } from './openingBookProvider';
 export type { MoveLabelResolution, MoveLabelResolutionInput } from './moveReviewLabelResolver';
 export { detectBrilliantMove, detectGreatMove, detectMiss };
 export type { BrilliantDetectionResult, GreatDetectionResult, MissDetectionResult } from './moveReviewSpecialLabels';
