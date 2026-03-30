@@ -97,6 +97,28 @@ export const ChessBoardWithControls = ({
   const topSide = displayPerspective === 'white' ? 'black' : 'white';
   const bottomSide = displayPerspective;
 
+  const materialBalance = useMemo(() => getMaterialBalanceFromFen(controller.fen, 'white'), [controller.fen]);
+  const materialLeader: 'white' | 'black' | null =
+    materialBalance.whiteMinusBlack === 0 ? null : materialBalance.whiteMinusBlack > 0 ? 'white' : 'black';
+  const materialLead = Math.abs(materialBalance.whiteMinusBlack);
+
+  const playerInfo = useMemo(
+    () => ({
+      white: {
+        name: activeGame?.white?.username?.trim() || 'White',
+        rating: activeGame?.white?.rating ?? null,
+      },
+      black: {
+        name: activeGame?.black?.username?.trim() || 'Black',
+        rating: activeGame?.black?.rating ?? null,
+      },
+    }),
+    [activeGame],
+  );
+
+  const topSide = displayPerspective === 'white' ? 'black' : 'white';
+  const bottomSide = displayPerspective;
+
   const loadChessComGames = useCallback(async () => {
     const normalizedUsername = normalizeChessComUsername(chessComUsername);
     if (!normalizedUsername) {
