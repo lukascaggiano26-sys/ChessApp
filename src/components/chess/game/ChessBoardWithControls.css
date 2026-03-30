@@ -69,6 +69,13 @@
   gap: 8px;
 }
 
+.inline-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .toggle-row {
   display: inline-flex;
   align-items: center;

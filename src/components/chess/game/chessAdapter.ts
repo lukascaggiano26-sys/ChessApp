@@ -17,6 +17,7 @@ export type ChessInstance = {
   history: (options?: { verbose?: boolean }) => Array<string | ChessMove>;
   undo: () => ChessMove | null;
   load: (fen: string) => boolean;
+  loadPgn: (pgn: string) => boolean;
   isCheck: () => boolean;
   inCheck?: () => boolean;
   isCheckmate?: () => boolean;
