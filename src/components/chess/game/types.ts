@@ -9,6 +9,7 @@ export interface ChessGameStatus {
 }
 
 export interface ChessControllerState {
+  startingFen: string;
   fen: string;
   turn: 'w' | 'b';
   selectedSquare: Square | null;
