@@ -515,7 +515,7 @@ export const ChessBoardWithControls = ({
 
           {showMoveList ? (
             <>
-              <div className="move-review-header">
+              <div className="-header">
                 <h4>Moves</h4>
                 <button type="button" className="chess-btn" onClick={runMoveReview} disabled={reviewLoading}>
                   {reviewLoading ? 'Reviewing…' : 'Review labels'}
@@ -588,7 +588,7 @@ export const ChessBoardWithControls = ({
                   </li>
                 ))}
               </ol>
-              <section className="move-review-panel" aria-live="polite">
+              <section className="-panel" aria-live="polite">
                 <h4>Move Review</h4>
                 {selectedReviewedMove ? (
                   <div className="move-review-panel__content">
@@ -629,7 +629,11 @@ export const ChessBoardWithControls = ({
                     ) : null}
                   </div>
                 ) : (
-                  <p className="move-review-panel__placeholder">Move review not generated yet</p>
+                  <p className="move-review-panel__placeholder">
+                    {moveReview
+                      ? 'Click a move in the list to see its review.'
+                      : 'Click "Review labels" to generate move review.'}
+                  </p>
                 )}
               </section>
               {reviewDebugMode && moveReview?.debugRows ? (
