@@ -77,18 +77,21 @@ export const kingSquareForTurn = (game: ChessInstance): Square | null => {
 export const buildControllerState = ({
   game,
   startingFen,
+  currentPly,
   lastMove,
   canUndo,
   canRedo,
 }: {
   game: ChessInstance;
   startingFen: string;
+  currentPly: number;
   lastMove: LastMove | null;
   canUndo: boolean;
   canRedo: boolean;
 }): ChessControllerState => ({
   startingFen,
   fen: game.fen(),
+  currentPly,
   turn: game.turn(),
   selectedSquare: null,
   legalMoves: [],

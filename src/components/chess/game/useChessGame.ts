@@ -37,6 +37,7 @@ export const useChessGame = ({
     buildControllerState({
       game: gameRef.current,
       startingFen: timelineRef.current.fens[0],
+      currentPly: 0,
       lastMove: null,
       canUndo: false,
       canRedo: false,
@@ -48,6 +49,7 @@ export const useChessGame = ({
       const nextState = buildControllerState({
         game: gameRef.current,
         startingFen: timelineRef.current.fens[0],
+        currentPly: timelineRef.current.currentIndex,
         lastMove: nextLastMove,
         canUndo: timelineRef.current.currentIndex > 0,
         canRedo: timelineRef.current.currentIndex < timelineRef.current.fens.length - 1,
@@ -234,6 +236,21 @@ export const useChessGame = ({
     syncState();
   }, [syncState]);
 
+  const jumpToPly = useCallback(
+    (plyIndex: number) => {
+      const clampedPly = Math.max(0, Math.min(plyIndex, timelineRef.current.fens.length - 1));
+      if (clampedPly === timelineRef.current.currentIndex) {
+        return;
+      }
+
+      const nextFen = timelineRef.current.fens[clampedPly];
+      gameRef.current.load(nextFen);
+      timelineRef.current.currentIndex = clampedPly;
+      syncState();
+    },
+    [syncState],
+  );
+
   const loadFen = useCallback(
     (fen: string): boolean => {
       const loaded = gameRef.current.load(fen.trim());
@@ -314,6 +331,7 @@ export const useChessGame = ({
       newGame,
       undoMove,
       redoMove,
+      jumpToPly,
       loadFen,
       loadPgn,
       reset,
@@ -329,6 +347,7 @@ export const useChessGame = ({
       onPieceDrop,
       onSquareClick,
       redoMove,
+      jumpToPly,
       reset,
       state,
       undoMove,
