@@ -44,9 +44,9 @@ export const EvaluationBar = ({
         >
           <div
             className="evalbar-black"
-            style={{ height: `${100 - fillPercent}%`, width: `${100 - fillPercent}%` }}
+            style={{ height: `${100 - fillPercent}%` }}
           />
-          <div className="evalbar-white" style={{ height: `${fillPercent}%`, width: `${fillPercent}%` }} />
+          <div className="evalbar-white" style={{ height: `${fillPercent}%` }} />
         </div>
       </div>
 
