@@ -10,40 +10,12 @@ import {
   type ChessComGame,
   type ChessComGamesResponse,
 } from './chessComUtils';
-import { MaterialAdvantageIndicator } from './MaterialAdvantageIndicator';
 import { EvaluationBar } from './EvaluationBar';
+import { getMaterialBalanceFromFen } from './materialBalance';
 import { useStockfishAnalysis } from './useStockfishAnalysis';
 import { useChessGame } from './useChessGame';
 import './ChessBoardWithControls.css';
 import type { StockfishEvaluation } from './stockfishAnalysis';
-
-const turnText = (turn: 'w' | 'b'): string => (turn === 'w' ? 'White to move' : 'Black to move');
-
-const statusText = (status: {
-  checkmate: boolean;
-  stalemate: boolean;
-  draw: boolean;
-  insufficientMaterial: boolean;
-  inCheck: boolean;
-}): string => {
-  if (status.checkmate) {
-    return 'Checkmate';
-  }
-  if (status.stalemate) {
-    return 'Stalemate';
-  }
-  if (status.insufficientMaterial) {
-    return 'Draw: insufficient material';
-  }
-  if (status.draw) {
-    return 'Draw';
-  }
-  if (status.inCheck) {
-    return 'Check';
-  }
-
-  return 'In progress';
-};
 
 export const ChessBoardWithControls = ({
   initialFen,
@@ -64,6 +36,7 @@ export const ChessBoardWithControls = ({
   const [games, setGames] = useState<ChessComGame[]>([]);
   const [selectedGameUrl, setSelectedGameUrl] = useState('');
   const [loadingGames, setLoadingGames] = useState(false);
+  const [activeGame, setActiveGame] = useState<ChessComGame | null>(null);
   const analysis = useStockfishAnalysis(controller.fen, true);
   const bestMoveArrow = showBestMove ? analysis.bestMove : null;
   
@@ -89,6 +62,28 @@ export const ChessBoardWithControls = ({
 
     return rows;
   }, [controller.movesSan]);
+
+  const materialBalance = useMemo(() => getMaterialBalanceFromFen(controller.fen, 'white'), [controller.fen]);
+  const materialLeader: 'white' | 'black' | null =
+    materialBalance.whiteMinusBlack === 0 ? null : materialBalance.whiteMinusBlack > 0 ? 'white' : 'black';
+  const materialLead = Math.abs(materialBalance.whiteMinusBlack);
+
+  const playerInfo = useMemo(
+    () => ({
+      white: {
+        name: activeGame?.white?.username?.trim() || 'White',
+        rating: activeGame?.white?.rating ?? null,
+      },
+      black: {
+        name: activeGame?.black?.username?.trim() || 'Black',
+        rating: activeGame?.black?.rating ?? null,
+      },
+    }),
+    [activeGame],
+  );
+
+  const topSide = displayPerspective === 'white' ? 'black' : 'white';
+  const bottomSide = displayPerspective;
 
   const loadChessComGames = useCallback(async () => {
     const normalizedUsername = normalizeChessComUsername(chessComUsername);
@@ -186,10 +181,24 @@ export const ChessBoardWithControls = ({
   return (
     <section className={`chess-shell ${className ?? ''}`.trim()}>
       <div className="chess-toolbar">
-        <button type="button" className="chess-btn" onClick={controller.newGame}>
+        <button
+          type="button"
+          className="chess-btn"
+          onClick={() => {
+            controller.newGame();
+            setActiveGame(null);
+          }}
+        >
           New game
         </button>
-        <button type="button" className="chess-btn" onClick={() => controller.reset(initialFen)}>
+        <button
+          type="button"
+          className="chess-btn"
+          onClick={() => {
+            controller.reset(initialFen);
+            setActiveGame(null);
+          }}
+        >
           Reset
         </button>
         <button type="button" className="chess-btn" onClick={controller.undoMove} disabled={!controller.canUndo}>
@@ -224,42 +233,53 @@ export const ChessBoardWithControls = ({
         </button>
       </div>
 
-      <div className="chess-meta">
-        <span className="chess-pill">{turnText(controller.turn)}</span>
-        <span className="chess-pill">{statusText(controller.status)}</span>
-        <MaterialAdvantageIndicator
-          fen={controller.fen}
-          perspective={displayPerspective}
-          className="chess-material-pill"
-        />
-      </div>
-
       <div className="chess-layout">
         <div className="board-analysis-stack">
           <EvaluationBar
             evaluation={stableEvaluation}
+            perspective={displayPerspective}
             depth={analysis.depth}
             isAnalyzing={analysis.isAnalyzing}
             error={analysis.error}
             className="board-evalbar"
           />
-          <ChessBoard
-            fen={controller.fen}
-            orientation={displayPerspective}
-            onSquareClick={controller.onSquareClick}
-            selectedSquare={controller.selectedSquare}
-            legalMoves={controller.legalMoves}
-            lastMove={controller.lastMove}
-            checkSquare={controller.checkSquare}
-            draggedSquare={controller.draggedSquare}
-            dragOverSquare={controller.dragOverSquare}
-            onPieceDragStart={controller.onPieceDragStart}
-            onPieceDragEnter={controller.onPieceDragEnter}
-            onPieceDrop={controller.onPieceDrop}
-            onPieceDragEnd={controller.onPieceDragEnd}
-            pieceSizeRatio={pieceSizeRatio}
-            bestMoveArrow={bestMoveArrow}
-          />
+          <div className="board-with-players">
+            <div className="player-row player-row--top">
+              <div className="player-name-wrap">
+                <strong className="player-name">{playerInfo[topSide].name}</strong>
+                {playerInfo[topSide].rating !== null ? (
+                  <span className="player-rating">({playerInfo[topSide].rating})</span>
+                ) : null}
+              </div>
+              {materialLeader === topSide ? <span className="player-material">+{materialLead}</span> : null}
+            </div>
+            <ChessBoard
+              fen={controller.fen}
+              orientation={displayPerspective}
+              onSquareClick={controller.onSquareClick}
+              selectedSquare={controller.selectedSquare}
+              legalMoves={controller.legalMoves}
+              lastMove={controller.lastMove}
+              checkSquare={controller.checkSquare}
+              draggedSquare={controller.draggedSquare}
+              dragOverSquare={controller.dragOverSquare}
+              onPieceDragStart={controller.onPieceDragStart}
+              onPieceDragEnter={controller.onPieceDragEnter}
+              onPieceDrop={controller.onPieceDrop}
+              onPieceDragEnd={controller.onPieceDragEnd}
+              pieceSizeRatio={pieceSizeRatio}
+              bestMoveArrow={bestMoveArrow}
+            />
+            <div className="player-row player-row--bottom">
+              <div className="player-name-wrap">
+                <strong className="player-name">{playerInfo[bottomSide].name}</strong>
+                {playerInfo[bottomSide].rating !== null ? (
+                  <span className="player-rating">({playerInfo[bottomSide].rating})</span>
+                ) : null}
+              </div>
+              {materialLeader === bottomSide ? <span className="player-material">+{materialLead}</span> : null}
+            </div>
+          </div>
         </div>
 
         <aside className="chess-sidepanel">
@@ -310,6 +330,7 @@ export const ChessBoardWithControls = ({
                 }
 
                 setFetchError(null);
+                setActiveGame(chosen);
                 const searchedPlayerSide = getPlayerSideInGame(chosen, chessComUsername);
                 if (searchedPlayerSide) {
                   setDisplayPerspective(searchedPlayerSide);
@@ -347,6 +368,7 @@ export const ChessBoardWithControls = ({
                 }
 
                 setFenError(null);
+                setActiveGame(null);
               }}
             >
               Load
