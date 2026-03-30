@@ -29,51 +29,61 @@ export class StockfishMoveReviewAnalyzer implements PositionAnalyzer {
 
   public analyzePosition = async (fen: string): Promise<PositionAnalysis> => {
     await this.ensureReady();
-
     return await new Promise<PositionAnalysis>((resolve) => {
       let evaluation: StockfishEvaluation | null = null;
       let bestMoveUci: string | null = null;
       let bestLine: string[] | null = null;
-
+      let searchStarted = false;
+  
       const timerId = window.setTimeout(() => {
-        this.worker.postMessage('stop');
         cleanup();
         resolve({ bestMoveUci, bestLine, evaluation });
       }, this.timeoutMs);
-
+  
       const cleanup = () => {
         window.clearTimeout(timerId);
         this.worker.removeEventListener('message', onMessage);
       };
-
+  
       const onMessage = (event: MessageEvent<unknown>) => {
         const line = typeof event.data === 'string' ? event.data : '';
         if (!line) {
           return;
         }
-
+  
+        // Ignore bestmove from the stop command before our search starts
+        if (!searchStarted) {
+          if (line.startsWith('readyok')) {
+            searchStarted = true;
+            this.worker.postMessage(`position fen ${fen}`);
+            this.worker.postMessage(`go depth ${this.depth}`);
+          }
+          return;
+        }
+  
         const info = parseInfoLine(line, fen);
         if (info?.evaluation) {
           evaluation = info.evaluation;
         }
-        if (info?.bestLine) {
-          bestLine = info.bestLine;
+  
+        const pvMatch = /\bpv\s+(.+)$/.exec(line);
+        if (pvMatch) {
+          bestLine = pvMatch[1].trim().split(/\s+/);
         }
-
+  
         const bestMove = parseBestMove(line);
         if (!bestMove) {
           return;
         }
-
+  
         bestMoveUci = `${bestMove.from}${bestMove.to}`;
         cleanup();
         resolve({ bestMoveUci, bestLine, evaluation });
       };
-
+  
       this.worker.addEventListener('message', onMessage);
       this.worker.postMessage('stop');
-      this.worker.postMessage(`position fen ${fen}`);
-      this.worker.postMessage(`go depth ${this.depth}`);
+      this.worker.postMessage('isready'); // readyok signals the stop is flushed
     });
   };
 
