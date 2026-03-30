@@ -19,7 +19,7 @@
   grid-template-rows: repeat(8, 1fr);
   border: 1px solid var(--board-border);
   border-radius: 14px;
-  overflow: hidden;
+  clip-path: inset(0 round 14px);
   box-shadow:
     0 10px 30px rgba(0, 0, 0, 0.16),
     0 2px 8px rgba(0, 0, 0, 0.08);
