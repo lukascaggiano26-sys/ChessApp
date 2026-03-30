@@ -98,6 +98,44 @@
   align-items: stretch;
 }
 
+.board-with-players {
+  display: grid;
+  gap: 8px;
+}
+
+.player-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  padding: 0 2px;
+  font-size: 13px;
+}
+
+.player-name-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.player-name {
+  color: #111827;
+  font-weight: 700;
+}
+
+.player-rating {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.player-material {
+  color: #111827;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .evalbar {
   display: grid;
   grid-template-rows: 1fr auto;
@@ -206,6 +244,9 @@
   .board-analysis-stack {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+  .player-row {
+    font-size: 12px;
   }
   .evalbar {
     width: 100%;
