@@ -5,35 +5,40 @@ import {
   asSquare,
   buildControllerState,
   getLegalDestinations,
-  getMoveListSan,
   type ChessInstance,
-  type ChessMove,
 } from './chessAdapter';
 import type { ChessControllerState, UseChessGameOptions } from './types';
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+type MoveTimeline = {
+  fens: string[];
+  lastMoves: Array<LastMove | null>;
+  currentIndex: number;
+};
 
 export const useChessGame = ({
   initialFen = START_FEN,
   onMove,
 }: UseChessGameOptions = {}) => {
   const gameRef = useRef<ChessInstance>(new Chess(initialFen) as unknown as ChessInstance);
-  // Lightweight redo: store forward FEN snapshots when undoing.
-  const redoFenStackRef = useRef<string[]>([]);
-  const lastMoveRef = useRef<LastMove | null>(null);
+  const timelineRef = useRef<MoveTimeline>({
+    fens: [gameRef.current.fen()],
+    lastMoves: [null],
+    currentIndex: 0,
+  });
 
   const [state, setState] = useState<ChessControllerState>(() =>
     buildControllerState({ game: gameRef.current, lastMove: null, canUndo: false, canRedo: false }),
   );
 
   const syncState = useCallback(
-    (nextLastMove: LastMove | null = lastMoveRef.current) => {
-      lastMoveRef.current = nextLastMove;
+    (nextLastMove: LastMove | null = timelineRef.current.lastMoves[timelineRef.current.currentIndex]) => {
       const nextState = buildControllerState({
         game: gameRef.current,
         lastMove: nextLastMove,
-        canUndo: getMoveListSan(gameRef.current).length > 0,
-        canRedo: redoFenStackRef.current.length > 0,
+        canUndo: timelineRef.current.currentIndex > 0,
+        canRedo: timelineRef.current.currentIndex < timelineRef.current.fens.length - 1,
       });
 
       setState(nextState);
@@ -65,8 +70,15 @@ export const useChessGame = ({
         return;
       }
 
-      redoFenStackRef.current = [];
-      syncState({ from: asSquare(result.from), to: asSquare(result.to) });
+      const nextLastMove = { from: asSquare(result.from), to: asSquare(result.to) };
+      const nextFen = gameRef.current.fen();
+      const nextIndex = timelineRef.current.currentIndex + 1;
+
+      timelineRef.current.fens = [...timelineRef.current.fens.slice(0, nextIndex), nextFen];
+      timelineRef.current.lastMoves = [...timelineRef.current.lastMoves.slice(0, nextIndex), nextLastMove];
+      timelineRef.current.currentIndex = nextIndex;
+
+      syncState(nextLastMove);
     },
     [clearSelection, syncState],
   );
@@ -170,52 +182,59 @@ export const useChessGame = ({
     }));
   }, []);
 
+  const resetTimeline = useCallback((fen: string) => {
+    timelineRef.current = {
+      fens: [fen],
+      lastMoves: [null],
+      currentIndex: 0,
+    };
+  }, []);
+
   const newGame = useCallback(() => {
     gameRef.current = new Chess(START_FEN) as unknown as ChessInstance;
-    redoFenStackRef.current = [];
+    resetTimeline(gameRef.current.fen());
     syncState(null);
-  }, [syncState]);
+  }, [resetTimeline, syncState]);
 
   const undoMove = useCallback(() => {
-    const currentFen = gameRef.current.fen();
-    const undone = gameRef.current.undo();
-    if (!undone) {
+    if (timelineRef.current.currentIndex === 0) {
       return;
     }
 
-    redoFenStackRef.current.push(currentFen);
+    const previousIndex = timelineRef.current.currentIndex - 1;
+    const previousFen = timelineRef.current.fens[previousIndex];
+    gameRef.current.load(previousFen);
+    timelineRef.current.currentIndex = previousIndex;
 
-    const history = gameRef.current.history({ verbose: true }) as ChessMove[];
-    const prior = history.at(-1);
-    syncState(prior ? { from: asSquare(prior.from), to: asSquare(prior.to) } : null);
+    syncState();
   }, [syncState]);
 
   const redoMove = useCallback(() => {
-  const redoFen = redoFenStackRef.current.pop();
-  if (!redoFen) {
-    return;
-  }
+    if (timelineRef.current.currentIndex >= timelineRef.current.fens.length - 1) {
+      return;
+    }
 
-  gameRef.current.load(redoFen);
+    const nextIndex = timelineRef.current.currentIndex + 1;
+    const nextFen = timelineRef.current.fens[nextIndex];
+    gameRef.current.load(nextFen);
+    timelineRef.current.currentIndex = nextIndex;
 
-  const history = gameRef.current.history({ verbose: true }) as ChessMove[];
-  const latest = history.at(-1);
-  syncState(latest ? { from: asSquare(latest.from), to: asSquare(latest.to) } : null);
-}, [syncState]);
+    syncState();
+  }, [syncState]);
 
   const loadFen = useCallback(
-  (fen: string): boolean => {
-    try {
-      gameRef.current.load(fen.trim());
-      redoFenStackRef.current = [];
-      syncState(null);
-      return true;
-    } catch {
-      return false;
-    }
-  },
-  [syncState],
-);
+    (fen: string): boolean => {
+      try {
+        gameRef.current.load(fen.trim());
+        resetTimeline(gameRef.current.fen());
+        syncState(null);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [resetTimeline, syncState],
+  );
 
   const reset = useCallback(
     (fen: string = initialFen) => {
@@ -223,10 +242,11 @@ export const useChessGame = ({
       if (!loaded) {
         gameRef.current = new Chess(initialFen) as unknown as ChessInstance;
       }
-      redoFenStackRef.current = [];
+
+      resetTimeline(gameRef.current.fen());
       syncState(null);
     },
-    [initialFen, syncState],
+    [initialFen, resetTimeline, syncState],
   );
 
   return useMemo(
