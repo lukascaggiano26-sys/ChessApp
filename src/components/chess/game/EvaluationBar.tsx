@@ -52,8 +52,8 @@ export const EvaluationBar = ({
         >
           {perspective === 'black' ? (
             <>
-              <div className="evalbar-white" style={{ height: `${fillPercent}%` }} />
-              <div className="evalbar-black" style={{ height: `${100 - fillPercent}%` }} />
+              <div className="evalbar-white" style={{ height: `${100 - fillPercent}%` }} />
+              <div className="evalbar-black" style={{ height: `${fillPercent}%` }} />
             </>
           ) : (
             <>
