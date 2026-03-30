@@ -1,5 +1,6 @@
 import stockfishUrl from 'stockfish/bin/stockfish-18-lite-single.js?url';
 import { parseBestMove, parseInfoLine, type StockfishEvaluation } from './stockfishAnalysis';
+import { applyUciMoveToFen } from './moveReviewTraversal';
 import type { PositionAnalyzer, PositionAnalysis } from './moveReviewTypes';
 
 export interface StockfishMoveReviewAnalyzerOptions {
@@ -77,8 +78,13 @@ export class StockfishMoveReviewAnalyzer implements PositionAnalyzer {
         if (!bestMove) {
           return;
         }
-  
-        bestMoveUci = `${bestMove.from}${bestMove.to}`;
+
+        const candidateBestMoveUci = `${bestMove.from}${bestMove.to}`;
+        if (!applyUciMoveToFen(fen, candidateBestMoveUci)) {
+          // Guard against stale worker output from a previous position search.
+          return;
+        }
+        bestMoveUci = candidateBestMoveUci;
         cleanup();
         resolve({ bestMoveUci, bestLine, evaluation });
       };
