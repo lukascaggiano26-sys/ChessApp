@@ -2,27 +2,19 @@ import type { JSX } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChessBoard } from '../board';
 import type { ChessBoardWithControlsProps } from './types';
+import {
+  gameLabel,
+  getPlayerSideInGame,
+  normalizeChessComUsername,
+  type ChessComArchivesResponse,
+  type ChessComGame,
+  type ChessComGamesResponse,
+} from './chessComUtils';
+import { MaterialAdvantageIndicator } from './MaterialAdvantageIndicator';
 import { EvaluationBar } from './EvaluationBar';
 import { useStockfishAnalysis } from './useStockfishAnalysis';
 import { useChessGame } from './useChessGame';
 import './ChessBoardWithControls.css';
-
-type ChessComGame = {
-  url: string;
-  pgn: string;
-  time_class?: string;
-  end_time?: number;
-  white?: { username?: string; rating?: number; result?: string };
-  black?: { username?: string; rating?: number; result?: string };
-};
-
-type ChessComArchivesResponse = {
-  archives?: string[];
-};
-
-type ChessComGamesResponse = {
-  games?: ChessComGame[];
-};
 
 const turnText = (turn: 'w' | 'b'): string => (turn === 'w' ? 'White to move' : 'Black to move');
 
@@ -52,23 +44,6 @@ const statusText = (status: {
   return 'In progress';
 };
 
-const formatDate = (epochSeconds?: number): string => {
-  if (!epochSeconds) {
-    return 'Unknown date';
-  }
-
-  return new Date(epochSeconds * 1000).toLocaleString();
-};
-
-const gameLabel = (game: ChessComGame): string => {
-  const whiteName = game.white?.username ?? 'White';
-  const blackName = game.black?.username ?? 'Black';
-  const whiteRating = game.white?.rating ? ` (${game.white.rating})` : '';
-  const blackRating = game.black?.rating ? ` (${game.black.rating})` : '';
-  const speed = game.time_class ?? 'game';
-  return `${whiteName}${whiteRating} vs ${blackName}${blackRating} • ${speed} • ${formatDate(game.end_time)}`;
-};
-
 export const ChessBoardWithControls = ({
   initialFen,
   orientation = 'white',
@@ -81,7 +56,7 @@ export const ChessBoardWithControls = ({
   const { redoMove, undoMove } = controller;
   const [fenInput, setFenInput] = useState(controller.fen);
   const [fenError, setFenError] = useState<string | null>(null);
-  const [currentOrientation, setCurrentOrientation] = useState(orientation);
+  const [displayPerspective, setDisplayPerspective] = useState<'white' | 'black'>(orientation);
   const [showBestMove, setShowBestMove] = useState(false);
   const [chessComUsername, setChessComUsername] = useState('');
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -90,6 +65,10 @@ export const ChessBoardWithControls = ({
   const [loadingGames, setLoadingGames] = useState(false);
   const analysis = useStockfishAnalysis(controller.fen, true);
   const bestMoveArrow = showBestMove ? analysis.bestMove : null;
+
+  useEffect(() => {
+    setDisplayPerspective(orientation);
+  }, [orientation]);
 
   const groupedMoves = useMemo(() => {
     const rows: string[] = [];
@@ -105,7 +84,7 @@ export const ChessBoardWithControls = ({
   }, [controller.movesSan]);
 
   const loadChessComGames = useCallback(async () => {
-    const normalizedUsername = chessComUsername.trim().toLowerCase();
+    const normalizedUsername = normalizeChessComUsername(chessComUsername);
     if (!normalizedUsername) {
       setFetchError('Enter a Chess.com username.');
       return;
@@ -216,10 +195,10 @@ export const ChessBoardWithControls = ({
           type="button"
           className="chess-btn"
           onClick={() =>
-            setCurrentOrientation((value) => (value === 'white' ? 'black' : 'white'))
+            setDisplayPerspective((value) => (value === 'white' ? 'black' : 'white'))
           }
         >
-          Flip board ({currentOrientation === 'white' ? 'White' : 'Black'} view)
+          Flip board ({displayPerspective === 'white' ? 'White' : 'Black'} view)
         </button>
         <button
           type="button"
@@ -241,12 +220,18 @@ export const ChessBoardWithControls = ({
       <div className="chess-meta">
         <span className="chess-pill">{turnText(controller.turn)}</span>
         <span className="chess-pill">{statusText(controller.status)}</span>
+        <MaterialAdvantageIndicator
+          fen={controller.fen}
+          perspective={displayPerspective}
+          className="chess-material-pill"
+        />
       </div>
 
       <div className="chess-layout">
         <div className="board-analysis-stack">
           <EvaluationBar
             evaluation={analysis.evaluation}
+            perspective={displayPerspective}
             depth={analysis.depth}
             isAnalyzing={analysis.isAnalyzing}
             error={analysis.error}
@@ -254,7 +239,7 @@ export const ChessBoardWithControls = ({
           />
           <ChessBoard
             fen={controller.fen}
-            orientation={currentOrientation}
+            orientation={displayPerspective}
             onSquareClick={controller.onSquareClick}
             selectedSquare={controller.selectedSquare}
             legalMoves={controller.legalMoves}
@@ -319,6 +304,10 @@ export const ChessBoardWithControls = ({
                 }
 
                 setFetchError(null);
+                const searchedPlayerSide = getPlayerSideInGame(chosen, chessComUsername);
+                if (searchedPlayerSide) {
+                  setDisplayPerspective(searchedPlayerSide);
+                }
               }}
             >
               Load selected game

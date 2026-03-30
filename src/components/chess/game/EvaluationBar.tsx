@@ -1,9 +1,15 @@
 import type { JSX } from 'react';
 import type { StockfishEvaluation } from './stockfishAnalysis';
-import { evaluationAriaLabel, evaluationToWhiteFillPercent } from './evaluationBarUtils';
+import type { PlayerSide } from './perspectiveUtils';
+import {
+  convertEvaluationToPerspective,
+  evaluationAriaLabel,
+  evaluationToPerspectiveFillPercent,
+} from './evaluationBarUtils';
 
 type EvaluationBarProps = {
   evaluation: StockfishEvaluation | null;
+  perspective?: PlayerSide;
   depth: number;
   isAnalyzing: boolean;
   error?: string | null;
@@ -23,13 +29,15 @@ const evalText = (evaluation: StockfishEvaluation | null, error: string | null |
 
 export const EvaluationBar = ({
   evaluation,
+  perspective = 'white',
   depth,
   isAnalyzing,
   error = null,
   className,
 }: EvaluationBarProps): JSX.Element => {
-  const display = evalText(evaluation, error);
-  const fillPercent = evaluationToWhiteFillPercent(evaluation);
+  const perspectiveEvaluation = convertEvaluationToPerspective(evaluation, perspective);
+  const display = evalText(perspectiveEvaluation, error);
+  const fillPercent = evaluationToPerspectiveFillPercent(evaluation, perspective);
 
   return (
     <section className={`evalbar ${className ?? ''}`.trim()} aria-label="Engine evaluation">
@@ -44,9 +52,9 @@ export const EvaluationBar = ({
         >
           <div
             className="evalbar-black"
-            style={{ height: `${100 - fillPercent}%` }}
+            style={{ height: `${100 - fillPercent}%`, width: `${100 - fillPercent}%` }}
           />
-          <div className="evalbar-white" style={{ height: `${fillPercent}%` }} />
+          <div className="evalbar-white" style={{ height: `${fillPercent}%`, width: `${fillPercent}%` }} />
         </div>
       </div>
 

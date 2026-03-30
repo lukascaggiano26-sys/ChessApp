@@ -34,13 +34,20 @@ export const useChessGame = ({
   });
 
   const [state, setState] = useState<ChessControllerState>(() =>
-    buildControllerState({ game: gameRef.current, lastMove: null, canUndo: false, canRedo: false }),
+    buildControllerState({
+      game: gameRef.current,
+      startingFen: timelineRef.current.fens[0],
+      lastMove: null,
+      canUndo: false,
+      canRedo: false,
+    }),
   );
 
   const syncState = useCallback(
     (nextLastMove: LastMove | null = timelineRef.current.lastMoves[timelineRef.current.currentIndex]) => {
       const nextState = buildControllerState({
         game: gameRef.current,
+        startingFen: timelineRef.current.fens[0],
         lastMove: nextLastMove,
         canUndo: timelineRef.current.currentIndex > 0,
         canRedo: timelineRef.current.currentIndex < timelineRef.current.fens.length - 1,
