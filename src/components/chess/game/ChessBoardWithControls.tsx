@@ -20,6 +20,16 @@ import { useChessGame } from './useChessGame';
 import './ChessBoardWithControls.css';
 import type { StockfishEvaluation } from './stockfishAnalysis';
 
+const formatUciMove = (uci: string | null): string | null => {
+  if (!uci || uci.length < 4) {
+    return null;
+  }
+  const from = uci.slice(0, 2);
+  const to = uci.slice(2, 4);
+  const promotion = uci.length > 4 ? `=${uci.slice(4).toUpperCase()}` : '';
+  return `${from}→${to}${promotion}`;
+};
+
 export const ChessBoardWithControls = ({
   initialFen,
   orientation = 'white',
@@ -60,20 +70,41 @@ export const ChessBoardWithControls = ({
   }, [orientation]);
 
   const groupedMoves = useMemo(() => {
-    const rows: Array<{ moveNumber: number; white: ReviewMove | null; black: ReviewMove | null }> = [];
+    const rows: Array<{
+      moveNumber: number;
+      white: ReviewMove | null;
+      black: ReviewMove | null;
+      whitePly: number;
+      blackPly: number;
+      hasWhiteMove: boolean;
+      hasBlackMove: boolean;
+    }> = [];
     const reviewMoves = moveReview?.moves ?? [];
 
     for (let i = 0; i < controller.movesSan.length; i += 2) {
       const moveNumber = i / 2 + 1;
+      const whitePly = i + 1;
+      const blackPly = i + 2;
       rows.push({
         moveNumber,
         white: reviewMoves[i] ?? null,
         black: reviewMoves[i + 1] ?? null,
+        whitePly,
+        blackPly,
+        hasWhiteMove: Boolean(controller.movesSan[i]),
+        hasBlackMove: Boolean(controller.movesSan[i + 1]),
       });
     }
 
     return rows;
   }, [controller.movesSan, moveReview]);
+
+  const selectedReviewedMove = useMemo(() => {
+    if (!moveReview || controller.currentPly <= 0) {
+      return null;
+    }
+    return moveReview.moves[controller.currentPly - 1] ?? null;
+  }, [controller.currentPly, moveReview]);
 
   const materialBalance = useMemo(() => getMaterialBalanceFromFen(controller.fen, 'white'), [controller.fen]);
   const materialLeader: 'white' | 'black' | null =
@@ -510,7 +541,14 @@ export const ChessBoardWithControls = ({
                     <span className="move-number">{row.moveNumber}.</span>
                     {reviewSideFilter !== 'black' ? (
                       <span className="move-entry">
-                        <span>{row.white?.san ?? controller.movesSan[(row.moveNumber - 1) * 2] ?? '--'}</span>
+                        <button
+                          type="button"
+                          className={`move-entry-button ${controller.currentPly === row.whitePly ? 'is-active' : ''}`}
+                          onClick={() => controller.jumpToPly(row.whitePly)}
+                          disabled={!row.hasWhiteMove}
+                        >
+                          {row.white?.san ?? controller.movesSan[row.whitePly - 1] ?? '--'}
+                        </button>
                         {row.white?.moveLabel ? (
                           <span
                             className={`move-label-badge move-label-badge--${row.white.moveLabel.toLowerCase()}`}
@@ -527,7 +565,14 @@ export const ChessBoardWithControls = ({
                     ) : null}
                     {reviewSideFilter !== 'white' ? (
                       <span className="move-entry">
-                        <span>{row.black?.san ?? controller.movesSan[(row.moveNumber - 1) * 2 + 1] ?? '--'}</span>
+                        <button
+                          type="button"
+                          className={`move-entry-button ${controller.currentPly === row.blackPly ? 'is-active' : ''}`}
+                          onClick={() => controller.jumpToPly(row.blackPly)}
+                          disabled={!row.hasBlackMove}
+                        >
+                          {row.black?.san ?? controller.movesSan[row.blackPly - 1] ?? '--'}
+                        </button>
                         {row.black?.moveLabel ? (
                           <span
                             className={`move-label-badge move-label-badge--${row.black.moveLabel.toLowerCase()}`}
@@ -543,6 +588,50 @@ export const ChessBoardWithControls = ({
                   </li>
                 ))}
               </ol>
+              <section className="move-review-panel" aria-live="polite">
+                <h4>Move Review</h4>
+                {selectedReviewedMove ? (
+                  <div className="move-review-panel__content">
+                    <div className="move-review-panel__label-row">
+                      <span className="move-review-panel__title">
+                        {Math.floor((selectedReviewedMove.plyIndex + 2) / 2)}.
+                        {selectedReviewedMove.playedBy === 'white' ? ' White' : ' Black'} {selectedReviewedMove.san}
+                      </span>
+                      {selectedReviewedMove.moveLabel ? (
+                        <span
+                          className={`move-label-badge move-label-badge--${selectedReviewedMove.moveLabel.toLowerCase()}`}
+                        >
+                          {selectedReviewedMove.moveLabel}
+                        </span>
+                      ) : (
+                        <span className="move-label-placeholder">Unlabeled</span>
+                      )}
+                    </div>
+                    <p className="move-review-panel__explanation">
+                      {selectedReviewedMove.labelExplanationSeed ??
+                        selectedReviewedMove.labelReason ??
+                        'No move-review explanation available.'}
+                    </p>
+                    {selectedReviewedMove.bestMoveUci ? (
+                      <p>
+                        <strong>Best move:</strong> {formatUciMove(selectedReviewedMove.bestMoveUci)}
+                      </p>
+                    ) : null}
+                    {selectedReviewedMove.expectedPointsLoss !== null ? (
+                      <p>
+                        <strong>Expected-points loss:</strong> {selectedReviewedMove.expectedPointsLoss.toFixed(3)}
+                      </p>
+                    ) : null}
+                    {selectedReviewedMove.metadata.centipawnLoss !== null ? (
+                      <p>
+                        <strong>Evaluation loss:</strong> {selectedReviewedMove.metadata.centipawnLoss} cp
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="move-review-panel__placeholder">Move review not generated yet</p>
+                )}
+              </section>
               {reviewDebugMode && moveReview?.debugRows ? (
                 <details className="review-debug-panel">
                   <summary>Review debug ({moveReview.debugRows.length} rows)</summary>

@@ -11,6 +11,7 @@ export interface ChessGameStatus {
 export interface ChessControllerState {
   startingFen: string;
   fen: string;
+  currentPly: number;
   turn: 'w' | 'b';
   selectedSquare: Square | null;
   legalMoves: Square[];
