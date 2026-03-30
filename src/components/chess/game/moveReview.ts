@@ -150,10 +150,12 @@ export const buildMoveReviewReport = async ({
     });
     const isBook = bookDetection.isBook;
 
-    const baseClassificationRaw =
+    const isBestMove = Boolean(before.bestMoveUci && ply.uci === before.bestMoveUci);
+
+    const baseClassification =
       expectedPointsLoss === null
         ? classifyBaseMoveByCentipawnFallback(centipawnLoss)
-        : classifyBaseMoveByExpectedPointsLoss(expectedPointsLoss);
+        : classifyBaseMoveByExpectedPointsLoss(expectedPointsLoss, undefined, isBestMove);
     const baseLabel = enforceBestLabelBoundary({
       baseLabel: baseClassificationRaw.label,
       playedUci: ply.uci,
