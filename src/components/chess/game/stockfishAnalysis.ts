@@ -14,12 +14,14 @@ export interface StockfishEvaluation {
 export interface ParsedInfoLine {
   depth: number | null;
   evaluation: StockfishEvaluation | null;
+  bestLine?: string[] | null;
 }
 
 const BESTMOVE_RE = /^bestmove\s([a-h][1-8][a-h][1-8])\b/i;
 const DEPTH_RE = /\bdepth\s(\d+)\b/i;
 const SCORE_CP_RE = /\bscore\scp\s(-?\d+)\b/i;
 const SCORE_MATE_RE = /\bscore\smate\s(-?\d+)\b/i;
+const PV_RE = /\bpv\s(.+)$/i;
 
 const sideToMoveFromFen = (fen: string): 'w' | 'b' => {
   const parts = fen.trim().split(/\s+/);
@@ -65,6 +67,8 @@ export const parseInfoLine = (line: string, fen: string): ParsedInfoLine | null 
 
   const depthMatch = DEPTH_RE.exec(trimmed);
   const depth = depthMatch ? Number.parseInt(depthMatch[1], 10) : null;
+  const pvMatch = PV_RE.exec(trimmed);
+  const bestLine = pvMatch?.[1]?.trim() ? pvMatch[1].trim().split(/\s+/).filter(Boolean) : null;
 
   const mateMatch = SCORE_MATE_RE.exec(trimmed);
   if (mateMatch) {
@@ -72,6 +76,7 @@ export const parseInfoLine = (line: string, fen: string): ParsedInfoLine | null 
     const normalized = normalizeToWhitePerspective(raw, fen);
     return {
       depth,
+      bestLine,
       evaluation: {
         type: 'mate',
         value: normalized,
@@ -87,6 +92,7 @@ export const parseInfoLine = (line: string, fen: string): ParsedInfoLine | null 
     const normalized = normalizeToWhitePerspective(raw, fen);
     return {
       depth,
+      bestLine,
       evaluation: {
         type: 'cp',
         value: normalized,
@@ -98,6 +104,7 @@ export const parseInfoLine = (line: string, fen: string): ParsedInfoLine | null 
 
   return {
     depth,
+    bestLine,
     evaluation: null,
   };
 };

@@ -1,6 +1,6 @@
 import stockfishUrl from 'stockfish/bin/stockfish-18-lite-single.js?url';
 import { parseBestMove, parseInfoLine, type StockfishEvaluation } from './stockfishAnalysis';
-import type { PositionAnalyzer, PositionAnalysis } from './moveReview';
+import type { PositionAnalyzer, PositionAnalysis } from './moveReviewTypes';
 
 export interface StockfishMoveReviewAnalyzerOptions {
   depth?: number;
@@ -33,11 +33,12 @@ export class StockfishMoveReviewAnalyzer implements PositionAnalyzer {
     return await new Promise<PositionAnalysis>((resolve) => {
       let evaluation: StockfishEvaluation | null = null;
       let bestMoveUci: string | null = null;
+      let bestLine: string[] | null = null;
 
       const timerId = window.setTimeout(() => {
         this.worker.postMessage('stop');
         cleanup();
-        resolve({ bestMoveUci, evaluation });
+        resolve({ bestMoveUci, bestLine, evaluation });
       }, this.timeoutMs);
 
       const cleanup = () => {
@@ -55,6 +56,9 @@ export class StockfishMoveReviewAnalyzer implements PositionAnalyzer {
         if (info?.evaluation) {
           evaluation = info.evaluation;
         }
+        if (info?.bestLine) {
+          bestLine = info.bestLine;
+        }
 
         const bestMove = parseBestMove(line);
         if (!bestMove) {
@@ -63,7 +67,7 @@ export class StockfishMoveReviewAnalyzer implements PositionAnalyzer {
 
         bestMoveUci = `${bestMove.from}${bestMove.to}`;
         cleanup();
-        resolve({ bestMoveUci, evaluation });
+        resolve({ bestMoveUci, bestLine, evaluation });
       };
 
       this.worker.addEventListener('message', onMessage);

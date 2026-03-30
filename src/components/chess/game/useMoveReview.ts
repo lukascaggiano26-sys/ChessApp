@@ -1,5 +1,12 @@
 import type { ChessMove } from './chessAdapter';
-import { buildMoveReviewReport, type MoveReviewConfig, type MoveReviewReport } from './moveReview';
+import {
+  buildMoveReviewReport,
+  type ExpectedPointsModelConfig,
+  type MoveReviewConfig,
+  type MoveReviewReport,
+  type PlayerRatings,
+} from './moveReview';
+import type { BookMoveDetector } from './moveReviewBook';
 import { StockfishMoveReviewAnalyzer, type StockfishMoveReviewAnalyzerOptions } from './stockfishMoveReviewAnalyzer';
 
 export interface BuildMoveReviewOptions {
@@ -7,6 +14,10 @@ export interface BuildMoveReviewOptions {
   history: ChessMove[];
   config?: Partial<MoveReviewConfig>;
   analyzerOptions?: StockfishMoveReviewAnalyzerOptions;
+  playerRatings?: PlayerRatings;
+  bookMoveDetector?: BookMoveDetector;
+  expectedPointsModelConfig?: Partial<ExpectedPointsModelConfig>;
+  debugMode?: boolean;
 }
 
 export const buildMoveReviewFromHistory = async ({
@@ -14,6 +25,10 @@ export const buildMoveReviewFromHistory = async ({
   history,
   config,
   analyzerOptions,
+  playerRatings,
+  bookMoveDetector,
+  expectedPointsModelConfig,
+  debugMode,
 }: BuildMoveReviewOptions): Promise<MoveReviewReport> => {
   const analyzer = new StockfishMoveReviewAnalyzer(analyzerOptions);
 
@@ -26,6 +41,10 @@ export const buildMoveReviewFromHistory = async ({
       })),
       analyzer,
       config,
+      playerRatings,
+      bookMoveDetector,
+      expectedPointsModelConfig,
+      debugMode,
     });
   } finally {
     analyzer.terminate();

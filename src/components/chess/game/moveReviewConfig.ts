@@ -1,0 +1,51 @@
+import type { MoveReviewConfig } from './moveReviewTypes';
+
+export const DEFAULT_MOVE_REVIEW_CONFIG: MoveReviewConfig = {
+  mateCpEquivalent: 1000,
+  expectedPointsScale: 120,
+  maxBookPly: 10,
+  defaultPlayerRating: 1500,
+  thresholds: {
+    excellentMaxCpLoss: 10,
+    goodMaxCpLoss: 40,
+    inaccuracyMaxCpLoss: 90,
+    mistakeMaxCpLoss: 200,
+    blunderMaxCpLoss: 500,
+    missExpectedPointsLoss: 0.2,
+    greatMaxExpectedPointsBefore: 0.35,
+    greatMaxExpectedPointsLoss: 0.03,
+    brilliantNearBestMaxExpectedPointsLoss: 0.03,
+    brilliantNearBestMaxCentipawnLoss: 35,
+    brilliantPostMoveMinExpectedPoints: 0.35,
+    brilliantPreMoveMaxExpectedPoints: 0.92,
+    brilliantBaseSacrificePoints: 1.5,
+    brilliantLowRating: 900,
+    brilliantHighRating: 2200,
+    brilliantRecoveryWindowPlies: 2,
+    brilliantQuickRecoveryMaxNetLoss: 0.5,
+    outcomeWinningThresholdLowRating: 0.75,
+    outcomeWinningThresholdHighRating: 0.7,
+    outcomeLosingThresholdLowRating: 0.25,
+    outcomeLosingThresholdHighRating: 0.3,
+    greatNearBestMaxExpectedPointsLoss: 0.02,
+    greatOnlyMoveMaxExpectedPointsLossLowRating: 0.03,
+    greatOnlyMoveMaxExpectedPointsLossHighRating: 0.015,
+    greatMinSwingLowRating: 0.16,
+    greatMinSwingHighRating: 0.24,
+    missOpportunityMinAfterBestLowRating: 0.8,
+    missOpportunityMinAfterBestHighRating: 0.75,
+    missPlayedMaxAfter: 0.55,
+    missMinGapLowRating: 0.2,
+    missMinGapHighRating: 0.14,
+    missMinGainFromBefore: 0.12,
+  },
+};
+
+export const mergeMoveReviewConfig = (config?: Partial<MoveReviewConfig>): MoveReviewConfig => ({
+  ...DEFAULT_MOVE_REVIEW_CONFIG,
+  ...config,
+  thresholds: {
+    ...DEFAULT_MOVE_REVIEW_CONFIG.thresholds,
+    ...(config?.thresholds ?? {}),
+  },
+});
