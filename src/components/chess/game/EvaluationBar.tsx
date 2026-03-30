@@ -37,16 +37,9 @@ export const EvaluationBar = ({
   className,
 }: EvaluationBarProps): JSX.Element => {
   const lastFillRef = useRef<number>(50);
-  const fillPercent = evaluation
-    ? (() => {
-        const val = evaluationToPerspectiveFillPercent(evaluation, perspective);
-        lastFillRef.current = val;
-        return val;
-      })()
-    : lastFillRef.current;
-
   const perspectiveEvaluation = convertEvaluationToPerspective(evaluation, perspective);
   const display = evalText(perspectiveEvaluation, error);
+  const fillPercent = evaluationToPerspectiveFillPercent(evaluation, perspective);
 
   return (
     <section className={`evalbar ${className ?? ''}`.trim()} aria-label="Engine evaluation">
