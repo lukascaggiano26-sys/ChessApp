@@ -88,9 +88,8 @@ export const ChessBoardWithControls = ({
   const [games, setGames] = useState<ChessComGame[]>([]);
   const [selectedGameUrl, setSelectedGameUrl] = useState('');
   const [loadingGames, setLoadingGames] = useState(false);
-  const analysis = useStockfishAnalysis(controller.fen, showBestMove);
-  const analysisView = showBestMove ? analysis : null;
-  const bestMoveArrow = analysisView?.bestMove ?? null;
+  const analysis = useStockfishAnalysis(controller.fen, true);
+  const bestMoveArrow = showBestMove ? analysis.bestMove : null;
 
   const groupedMoves = useMemo(() => {
     const rows: string[] = [];
