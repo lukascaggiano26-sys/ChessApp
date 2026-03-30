@@ -49,6 +49,7 @@ export const EvaluationBar = ({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(fillPercent)}
+          style={{ ['--white-fill' as string]: `${fillPercent}%` }}
         >
           <div
             className="evalbar-black"
