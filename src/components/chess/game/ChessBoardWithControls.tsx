@@ -15,6 +15,7 @@ import { EvaluationBar } from './EvaluationBar';
 import { useStockfishAnalysis } from './useStockfishAnalysis';
 import { useChessGame } from './useChessGame';
 import './ChessBoardWithControls.css';
+import type { StockfishEvaluation } from './stockfishAnalysis';
 
 const turnText = (turn: 'w' | 'b'): string => (turn === 'w' ? 'White to move' : 'Black to move');
 
@@ -65,11 +66,12 @@ export const ChessBoardWithControls = ({
   const [loadingGames, setLoadingGames] = useState(false);
   const analysis = useStockfishAnalysis(controller.fen, true);
   const bestMoveArrow = showBestMove ? analysis.bestMove : null;
-  const lastEvaluationRef = useRef(analysis.evaluation);
-if (analysis.evaluation !== null) {
-  lastEvaluationRef.current = analysis.evaluation;
-}
-const stableEvaluation = lastEvaluationRef.current;
+  
+  const lastEvaluationRef = useRef<StockfishEvaluation | null>(null);
+  const stableEvaluation = analysis.evaluation ?? lastEvaluationRef.current;
+  if (analysis.evaluation !== null) {
+    lastEvaluationRef.current = analysis.evaluation;
+  }
 
   useEffect(() => {
     setDisplayPerspective(orientation);
