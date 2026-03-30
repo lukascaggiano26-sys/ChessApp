@@ -19,6 +19,7 @@ const parseFenHeaderFromPgn = (pgn: string): string | null => {
 type MoveTimeline = {
   fens: string[];
   lastMoves: Array<LastMove | null>;
+  sanMoves: string[];
   currentIndex: number;
 };
 
@@ -30,6 +31,7 @@ export const useChessGame = ({
   const timelineRef = useRef<MoveTimeline>({
     fens: [gameRef.current.fen()],
     lastMoves: [null],
+    sanMoves: [],
     currentIndex: 0,
   });
 
@@ -53,6 +55,7 @@ export const useChessGame = ({
         lastMove: nextLastMove,
         canUndo: timelineRef.current.currentIndex > 0,
         canRedo: timelineRef.current.currentIndex < timelineRef.current.fens.length - 1,
+        movesSan: timelineRef.current.sanMoves.slice(0, timelineRef.current.currentIndex),
       });
 
       setState(nextState);
@@ -90,6 +93,7 @@ export const useChessGame = ({
 
       timelineRef.current.fens = [...timelineRef.current.fens.slice(0, nextIndex), nextFen];
       timelineRef.current.lastMoves = [...timelineRef.current.lastMoves.slice(0, nextIndex), nextLastMove];
+      timelineRef.current.sanMoves = [...timelineRef.current.sanMoves.slice(0, nextIndex - 1), String(result.san)];
       timelineRef.current.currentIndex = nextIndex;
 
       syncState(nextLastMove);
@@ -200,6 +204,7 @@ export const useChessGame = ({
     timelineRef.current = {
       fens: [fen],
       lastMoves: [null],
+      sanMoves: [],
       currentIndex: 0,
     };
   }, []);
@@ -276,6 +281,7 @@ export const useChessGame = ({
         const verboseMoves = validator.history({ verbose: true });
         const fens: string[] = [replayGame.fen()];
         const lastMoves: Array<LastMove | null> = [null];
+        const sanMoves: string[] = [];
 
         for (const move of verboseMoves) {
           if (typeof move === 'string') {
@@ -289,12 +295,14 @@ export const useChessGame = ({
 
           fens.push(replayGame.fen());
           lastMoves.push({ from: asSquare(appliedMove.from), to: asSquare(appliedMove.to) });
+          sanMoves.push(String(appliedMove.san ?? move.san));
         }
 
         gameRef.current = new Chess(fens[0]) as unknown as ChessInstance;
         timelineRef.current = {
           fens,
           lastMoves,
+          sanMoves,
           currentIndex: 0,
         };
 
