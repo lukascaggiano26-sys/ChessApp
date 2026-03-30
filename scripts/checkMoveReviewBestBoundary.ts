@@ -27,6 +27,14 @@ const fixtures: Fixture[] = [
     expectedLabel: 'Best',
   },
   {
+    name: 'exact engine-best move is forced to Best even if loss bucket is lower',
+    fenBefore: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+    playedUci: 'd2d4',
+    bestMoveUci: 'd2d4',
+    baseLabel: 'Excellent',
+    expectedLabel: 'Best',
+  },
+  {
     name: 'near-best but non-identical is Excellent',
     fenBefore: 'r1bqkbnr/pppppppp/n7/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
     playedUci: 'g8f6',

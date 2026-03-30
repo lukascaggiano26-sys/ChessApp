@@ -24,11 +24,14 @@ export const enforceBestLabelBoundary = ({
   playedUci: string;
   bestMoveUci: string | null;
 }): MoveLabel | null => {
-  if (baseLabel !== 'Best') {
-    return baseLabel;
+  const isExactEngineBest = isPlayedMoveEqualToEngineBest(playedUci, bestMoveUci);
+
+  // Strict rule:
+  // - Best: only the exact engine-best move from fenBefore (UCI identity match).
+  // - Excellent: if loss-based base classification produced Best but move is not exact-best.
+  if (isExactEngineBest) {
+    return 'Best';
   }
 
-  // "Best" is reserved for the exact engine-best move from fenBefore.
-  // Non-identical near-best moves should surface as "Excellent".
-  return isPlayedMoveEqualToEngineBest(playedUci, bestMoveUci) ? 'Best' : 'Excellent';
+  return baseLabel === 'Best' ? 'Excellent' : baseLabel;
 };
