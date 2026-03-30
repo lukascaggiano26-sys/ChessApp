@@ -7,8 +7,10 @@ export interface StockfishMoveReviewAnalyzerOptions {
   timeoutMs?: number;
 }
 
-const DEFAULT_DEPTH = 14;
-const DEFAULT_TIMEOUT_MS = 5000;
+// Move-review labeling is sensitive in openings where many moves are close.
+// Use a slightly deeper default search for more stable best-move selection.
+const DEFAULT_DEPTH = 16;
+const DEFAULT_TIMEOUT_MS = 7000;
 
 export class StockfishMoveReviewAnalyzer implements PositionAnalyzer {
   private readonly worker: Worker;

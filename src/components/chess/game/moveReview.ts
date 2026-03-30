@@ -15,6 +15,10 @@ import {
   whiteCpToSideCp,
 } from './moveReviewExpectedPoints';
 import { applyUciMoveToFen, traverseGameMoves } from './moveReviewTraversal';
+import {
+  enforceBestLabelBoundary,
+  isPlayedMoveEqualToEngineBest,
+} from './moveReviewBestBoundary';
 import type {
   MoveReviewConfig,
   MoveReviewLabel,
@@ -52,6 +56,7 @@ export const buildMoveReviewReport = async ({
   expectedPointsModelConfig?: Partial<ExpectedPointsModelConfig>;
   debugMode?: boolean;
 }): Promise<MoveReviewReport> => {
+  const DEBUG_TARGET_FEN_AFTER_E4 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
   const mergedConfig = mergeMoveReviewConfig({
     ...DEFAULT_MOVE_REVIEW_CALIBRATION_CONFIG.reviewConfig,
     ...config,
@@ -125,15 +130,18 @@ export const buildMoveReviewReport = async ({
       mergedExpectedPointsModelConfig,
     );
 
-    const centipawnLoss =
+    const rawCentipawnLoss =
       cpAfterBestForMover === null || cpAfterPlayedForMover === null
         ? null
-        : Math.max(0, cpAfterBestForMover - cpAfterPlayedForMover);
+        : cpAfterBestForMover - cpAfterPlayedForMover;
+    const centipawnLoss = rawCentipawnLoss === null ? null : Math.max(0, rawCentipawnLoss);
 
-    const expectedPointsLoss =
+    const rawExpectedPointsLoss =
       expectedPointsAfterBest === null || expectedPointsAfterPlayed === null
         ? null
-        : Math.max(0, expectedPointsAfterBest - expectedPointsAfterPlayed);
+        : expectedPointsAfterBest - expectedPointsAfterPlayed;
+    const expectedPointsLoss = rawExpectedPointsLoss === null ? null : Math.max(0, rawExpectedPointsLoss);
+    const isPlayedMoveIdenticalToBest = isPlayedMoveEqualToEngineBest(ply.uci, before.bestMoveUci);
 
     const bookDetection = detector.detectMove({
       fenBefore: ply.fenBefore,
@@ -142,10 +150,29 @@ export const buildMoveReviewReport = async ({
     });
     const isBook = bookDetection.isBook;
 
-    const baseClassification =
+    const baseClassificationRaw =
       expectedPointsLoss === null
         ? classifyBaseMoveByCentipawnFallback(centipawnLoss)
         : classifyBaseMoveByExpectedPointsLoss(expectedPointsLoss);
+    const baseLabel = enforceBestLabelBoundary({
+      baseLabel: baseClassificationRaw.label,
+      playedUci: ply.uci,
+      bestMoveUci: before.bestMoveUci,
+    });
+    // Label semantics boundary:
+    // - Best: exact engine-best move from fenBefore.
+    // - Excellent: near-best/tiny-loss but non-identical to the engine-best move.
+    const baseClassification =
+      baseLabel === baseClassificationRaw.label
+        ? baseClassificationRaw
+        : {
+            ...baseClassificationRaw,
+            label: baseLabel,
+            explanation: {
+              ...baseClassificationRaw.explanation,
+              bucket: 'excellent' as const,
+            },
+          };
     const brilliant = detectBrilliantMove({
       expectedPointsLoss,
       centipawnLoss,
@@ -222,10 +249,18 @@ export const buildMoveReviewReport = async ({
     });
 
     if (debugMode) {
-      debugRows.push({
+      const debugRow: MoveReviewDebugRow = {
         plyIndex: ply.plyIndex,
+        fenBefore: ply.fenBefore,
+        playedMoveSan: ply.san,
+        playedMoveUci: ply.uci,
         san: ply.san,
         playedBy: ply.playedBy,
+        engineQueriedFromFenBefore: true,
+        engineBestMoveUciFromFenBefore: before.bestMoveUci,
+        isPlayedMoveIdenticalToBest,
+        rawExpectedPointsLoss,
+        rawCentipawnLoss,
         finalLabel: labelResolution.label,
         finalReasonCode: labelResolution.reasonCode,
         baseLabel: baseClassification.label,
@@ -248,7 +283,17 @@ export const buildMoveReviewReport = async ({
           expectedPointsBaseSteepness: mergedExpectedPointsModelConfig.baseSteepness,
           expectedPointsRatingExponent: mergedExpectedPointsModelConfig.ratingExponent,
         },
-      });
+        tolerancesUsed: {
+          baseClassificationEpsilon: baseClassification.explanation.epsilon,
+          identicalMoveCheck: 'exact-uci-match',
+          clampedLossAtZero: (rawExpectedPointsLoss ?? 0) < 0 || (rawCentipawnLoss ?? 0) < 0,
+        },
+      };
+      debugRows.push(debugRow);
+
+      if (ply.fenBefore === DEBUG_TARGET_FEN_AFTER_E4 && typeof console !== 'undefined') {
+        console.info('[move-review debug] position after 1.e4', debugRow);
+      }
     }
   }
 
