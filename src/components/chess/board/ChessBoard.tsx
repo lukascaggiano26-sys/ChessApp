@@ -22,6 +22,7 @@ export const ChessBoard = ({
   onPieceDragEnd,
   className,
   pieceSizeRatio = 0.84,
+  bestMoveArrow = null,
 }: ChessBoardProps): JSX.Element => {
   const board = parseFenBoard(fen);
   const displaySquares = createDisplaySquares(orientation);
@@ -49,6 +50,28 @@ export const ChessBoard = ({
 
   const draggingEnabled = Boolean(onPieceDragStart && onPieceDrop && onPieceDragEnd && !coarsePointer);
 
+  const toBoardIndex = (square: Square): { fileIndex: number; rankIndex: number } => {
+    const fileIndex = square.charCodeAt(0) - 97;
+    const rankFromBottom = Number(square[1]) - 1;
+
+    if (orientation === 'white') {
+      return { fileIndex, rankIndex: 7 - rankFromBottom };
+    }
+
+    return { fileIndex: 7 - fileIndex, rankIndex: rankFromBottom };
+  };
+
+  const squareCenterPercent = (square: Square): { x: number; y: number } => {
+    const { fileIndex, rankIndex } = toBoardIndex(square);
+    return {
+      x: (fileIndex + 0.5) * 12.5,
+      y: (rankIndex + 0.5) * 12.5,
+    };
+  };
+
+  const arrowFrom = bestMoveArrow ? squareCenterPercent(bestMoveArrow.from) : null;
+  const arrowTo = bestMoveArrow ? squareCenterPercent(bestMoveArrow.to) : null;
+
   return (
     <div
       className={cn('chess-board', className)}
@@ -56,6 +79,36 @@ export const ChessBoard = ({
         ['--piece-size-ratio' as string]: String(pieceSizeRatio),
       }}
     >
+      {arrowFrom && arrowTo ? (
+        <svg
+          className="best-move-overlay"
+          viewBox="0 0 100 100"
+          aria-hidden="true"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <marker
+              id="best-move-arrow-head"
+              markerWidth="5"
+              markerHeight="5"
+              refX="4.2"
+              refY="2.5"
+              orient="auto"
+            >
+              <path d="M0,0 L5,2.5 L0,5 z" className="best-move-arrow-head" />
+            </marker>
+          </defs>
+          <line
+            x1={arrowFrom.x}
+            y1={arrowFrom.y}
+            x2={arrowTo.x}
+            y2={arrowTo.y}
+            className="best-move-arrow-line"
+            markerEnd="url(#best-move-arrow-head)"
+          />
+        </svg>
+      ) : null}
+
       {displaySquares.map((square, index) => {
         const piece = board.get(square);
         const file = square[0];
