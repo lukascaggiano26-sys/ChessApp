@@ -6,7 +6,6 @@ import {
   evaluationAriaLabel,
   evaluationToPerspectiveFillPercent,
 } from './evaluationBarUtils';
-import { useRef } from 'react';
 
 type EvaluationBarProps = {
   evaluation: StockfishEvaluation | null;
@@ -24,7 +23,6 @@ const evalText = (evaluation: StockfishEvaluation | null, error: string | null |
   if (!evaluation) {
     return '--';
   }
-
   return evaluation.display;
 };
 
@@ -36,7 +34,6 @@ export const EvaluationBar = ({
   error = null,
   className,
 }: EvaluationBarProps): JSX.Element => {
-  const lastFillRef = useRef<number>(50);
   const perspectiveEvaluation = convertEvaluationToPerspective(evaluation, perspective);
   const display = evalText(perspectiveEvaluation, error);
   const fillPercent = evaluationToPerspectiveFillPercent(evaluation, perspective);
@@ -66,7 +63,6 @@ export const EvaluationBar = ({
           )}
         </div>
       </div>
-
       <div className="evalbar-meta">
         <strong className="evalbar-score">{display}</strong>
         <small className="evalbar-depth">
