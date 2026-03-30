@@ -47,7 +47,6 @@ export const EvaluationBar = ({
 
   const perspectiveEvaluation = convertEvaluationToPerspective(evaluation, perspective);
   const display = evalText(perspectiveEvaluation, error);
-  const fillPercent = evaluationToPerspectiveFillPercent(evaluation, perspective);
 
   return (
     <section className={`evalbar ${className ?? ''}`.trim()} aria-label="Engine evaluation">
