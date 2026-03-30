@@ -33,4 +33,5 @@ export interface ChessBoardProps {
   onPieceDragEnd?: () => void;
   className?: string;
   pieceSizeRatio?: number;
+  bestMoveArrow?: LastMove | null;
 }

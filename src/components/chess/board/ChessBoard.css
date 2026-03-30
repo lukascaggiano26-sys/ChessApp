@@ -24,6 +24,24 @@
     0 10px 30px rgba(0, 0, 0, 0.16),
     0 2px 8px rgba(0, 0, 0, 0.08);
   background: #161616;
+  position: relative;
+}
+
+.best-move-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.best-move-arrow-line {
+  stroke: rgba(125, 211, 252, 0.46);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+.best-move-arrow-head {
+  fill: rgba(125, 211, 252, 0.46);
 }
 
 .chess-square {
@@ -39,6 +57,7 @@
   -webkit-tap-highlight-color: transparent;
   transition: filter 140ms ease, box-shadow 140ms ease, transform 120ms ease;
   will-change: filter;
+  z-index: 1;
 }
 
 .chess-square.is-clickable {

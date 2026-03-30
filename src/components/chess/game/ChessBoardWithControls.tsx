@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { ChessBoard } from '../board';
 import type { ChessBoardWithControlsProps } from './types';
+import { useStockfishBestMove } from './useStockfishBestMove';
 import { useChessGame } from './useChessGame';
 import './ChessBoardWithControls.css';
 
@@ -46,6 +47,8 @@ export const ChessBoardWithControls = ({
   const [fenInput, setFenInput] = useState(controller.fen);
   const [fenError, setFenError] = useState<string | null>(null);
   const [currentOrientation, setCurrentOrientation] = useState(orientation);
+  const [showBestMove, setShowBestMove] = useState(false);
+  const bestMoveArrow = useStockfishBestMove(controller.fen, showBestMove);
 
   const groupedMoves = useMemo(() => {
     const rows: string[] = [];
@@ -156,10 +159,21 @@ export const ChessBoardWithControls = ({
           onPieceDrop={controller.onPieceDrop}
           onPieceDragEnd={controller.onPieceDragEnd}
           pieceSizeRatio={pieceSizeRatio}
+          bestMoveArrow={bestMoveArrow}
         />
 
         <aside className="chess-sidepanel">
           <div className="fen-row">
+            <label className="toggle-row" htmlFor="show-best-move-toggle">
+              <input
+                id="show-best-move-toggle"
+                type="checkbox"
+                checked={showBestMove}
+                onChange={(event) => setShowBestMove(event.target.checked)}
+              />
+              <span>Show best move</span>
+            </label>
+
             <label htmlFor="fen-input">Load FEN</label>
             <input
               id="fen-input"
