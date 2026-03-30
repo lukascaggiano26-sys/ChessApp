@@ -93,7 +93,7 @@
 
 .board-analysis-stack {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
 }
