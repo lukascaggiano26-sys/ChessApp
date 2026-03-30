@@ -1,10 +1,28 @@
 import type { JSX } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChessBoard } from '../board';
 import type { ChessBoardWithControlsProps } from './types';
-import { useStockfishBestMove } from './useStockfishBestMove';
+import { EvaluationBar } from './EvaluationBar';
+import { useStockfishAnalysis } from './useStockfishAnalysis';
 import { useChessGame } from './useChessGame';
 import './ChessBoardWithControls.css';
+
+type ChessComGame = {
+  url: string;
+  pgn: string;
+  time_class?: string;
+  end_time?: number;
+  white?: { username?: string; rating?: number; result?: string };
+  black?: { username?: string; rating?: number; result?: string };
+};
+
+type ChessComArchivesResponse = {
+  archives?: string[];
+};
+
+type ChessComGamesResponse = {
+  games?: ChessComGame[];
+};
 
 const turnText = (turn: 'w' | 'b'): string => (turn === 'w' ? 'White to move' : 'Black to move');
 
@@ -34,6 +52,23 @@ const statusText = (status: {
   return 'In progress';
 };
 
+const formatDate = (epochSeconds?: number): string => {
+  if (!epochSeconds) {
+    return 'Unknown date';
+  }
+
+  return new Date(epochSeconds * 1000).toLocaleString();
+};
+
+const gameLabel = (game: ChessComGame): string => {
+  const whiteName = game.white?.username ?? 'White';
+  const blackName = game.black?.username ?? 'Black';
+  const whiteRating = game.white?.rating ? ` (${game.white.rating})` : '';
+  const blackRating = game.black?.rating ? ` (${game.black.rating})` : '';
+  const speed = game.time_class ?? 'game';
+  return `${whiteName}${whiteRating} vs ${blackName}${blackRating} • ${speed} • ${formatDate(game.end_time)}`;
+};
+
 export const ChessBoardWithControls = ({
   initialFen,
   orientation = 'white',
@@ -48,7 +83,14 @@ export const ChessBoardWithControls = ({
   const [fenError, setFenError] = useState<string | null>(null);
   const [currentOrientation, setCurrentOrientation] = useState(orientation);
   const [showBestMove, setShowBestMove] = useState(false);
-  const bestMoveArrow = useStockfishBestMove(controller.fen, showBestMove);
+  const [chessComUsername, setChessComUsername] = useState('');
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [games, setGames] = useState<ChessComGame[]>([]);
+  const [selectedGameUrl, setSelectedGameUrl] = useState('');
+  const [loadingGames, setLoadingGames] = useState(false);
+  const analysis = useStockfishAnalysis(controller.fen, showBestMove);
+  const analysisView = showBestMove ? analysis : null;
+  const bestMoveArrow = analysisView?.bestMove ?? null;
 
   const groupedMoves = useMemo(() => {
     const rows: string[] = [];
@@ -63,6 +105,65 @@ export const ChessBoardWithControls = ({
     return rows;
   }, [controller.movesSan]);
 
+  const loadChessComGames = useCallback(async () => {
+    const normalizedUsername = chessComUsername.trim().toLowerCase();
+    if (!normalizedUsername) {
+      setFetchError('Enter a Chess.com username.');
+      return;
+    }
+
+    setLoadingGames(true);
+    setFetchError(null);
+
+    try {
+      const archiveResponse = await fetch(`https://api.chess.com/pub/player/${normalizedUsername}/games/archives`);
+      if (!archiveResponse.ok) {
+        throw new Error('Could not find archives for that player.');
+      }
+
+      const archiveData = (await archiveResponse.json()) as ChessComArchivesResponse;
+      const archives = archiveData.archives ?? [];
+      if (!archives.length) {
+        setGames([]);
+        setSelectedGameUrl('');
+        setFetchError('No archived games found for that account.');
+        return;
+      }
+
+      const recentArchives = archives.slice(-3).reverse();
+      const archiveGames = await Promise.all(
+        recentArchives.map(async (archiveUrl) => {
+          const response = await fetch(archiveUrl);
+          if (!response.ok) {
+            return [] as ChessComGame[];
+          }
+
+          const data = (await response.json()) as ChessComGamesResponse;
+          return data.games ?? [];
+        }),
+      );
+
+      const mergedGames = archiveGames
+        .flat()
+        .filter((game) => Boolean(game.pgn))
+        .sort((a, b) => (b.end_time ?? 0) - (a.end_time ?? 0))
+        .slice(0, 25);
+
+      setGames(mergedGames);
+      setSelectedGameUrl(mergedGames[0]?.url ?? '');
+
+      if (!mergedGames.length) {
+        setFetchError('No recent PGN games were returned.');
+      }
+    } catch {
+      setGames([]);
+      setSelectedGameUrl('');
+      setFetchError('Failed to load games from Chess.com.');
+    } finally {
+      setLoadingGames(false);
+    }
+  }, [chessComUsername]);
+
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -74,7 +175,7 @@ export const ChessBoardWithControls = ({
       }
 
       const tag = target.tagName.toLowerCase();
-      return tag === 'input' || tag === 'textarea' || target.isContentEditable;
+      return tag === 'input' || tag === 'textarea' || target.isContentEditable || tag === 'select';
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -144,26 +245,86 @@ export const ChessBoardWithControls = ({
       </div>
 
       <div className="chess-layout">
-        <ChessBoard
-          fen={controller.fen}
-          orientation={currentOrientation}
-          onSquareClick={controller.onSquareClick}
-          selectedSquare={controller.selectedSquare}
-          legalMoves={controller.legalMoves}
-          lastMove={controller.lastMove}
-          checkSquare={controller.checkSquare}
-          draggedSquare={controller.draggedSquare}
-          dragOverSquare={controller.dragOverSquare}
-          onPieceDragStart={controller.onPieceDragStart}
-          onPieceDragEnter={controller.onPieceDragEnter}
-          onPieceDrop={controller.onPieceDrop}
-          onPieceDragEnd={controller.onPieceDragEnd}
-          pieceSizeRatio={pieceSizeRatio}
-          bestMoveArrow={bestMoveArrow}
-        />
+        <div className="board-analysis-stack">
+          <EvaluationBar
+            evaluation={analysisView?.evaluation ?? null}
+            depth={analysisView?.depth ?? 0}
+            isAnalyzing={analysisView?.isAnalyzing ?? false}
+            error={analysisView?.error ?? null}
+            className="board-evalbar"
+          />
+          <ChessBoard
+            fen={controller.fen}
+            orientation={currentOrientation}
+            onSquareClick={controller.onSquareClick}
+            selectedSquare={controller.selectedSquare}
+            legalMoves={controller.legalMoves}
+            lastMove={controller.lastMove}
+            checkSquare={controller.checkSquare}
+            draggedSquare={controller.draggedSquare}
+            dragOverSquare={controller.dragOverSquare}
+            onPieceDragStart={controller.onPieceDragStart}
+            onPieceDragEnter={controller.onPieceDragEnter}
+            onPieceDrop={controller.onPieceDrop}
+            onPieceDragEnd={controller.onPieceDragEnd}
+            pieceSizeRatio={pieceSizeRatio}
+            bestMoveArrow={bestMoveArrow}
+          />
+        </div>
 
         <aside className="chess-sidepanel">
           <div className="fen-row">
+            <label htmlFor="chesscom-username">Chess.com username</label>
+            <div className="inline-row">
+              <input
+                id="chesscom-username"
+                className="fen-input"
+                value={chessComUsername}
+                onChange={(event) => setChessComUsername(event.target.value)}
+                placeholder="e.g. hikaru"
+              />
+              <button type="button" className="chess-btn" onClick={loadChessComGames} disabled={loadingGames}>
+                {loadingGames ? 'Loading...' : 'Fetch'}
+              </button>
+            </div>
+
+            <label htmlFor="chesscom-game-select">Recent games</label>
+            <select
+              id="chesscom-game-select"
+              className="fen-input"
+              value={selectedGameUrl}
+              onChange={(event) => setSelectedGameUrl(event.target.value)}
+              disabled={!games.length}
+            >
+              <option value="">Select a game</option>
+              {games.map((game) => (
+                <option key={game.url} value={game.url}>
+                  {gameLabel(game)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="chess-btn"
+              disabled={!selectedGameUrl}
+              onClick={() => {
+                const chosen = games.find((game) => game.url === selectedGameUrl);
+                if (!chosen) {
+                  return;
+                }
+
+                const loaded = controller.loadPgn(chosen.pgn);
+                if (!loaded) {
+                  setFetchError('Unable to load the selected PGN.');
+                  return;
+                }
+
+                setFetchError(null);
+              }}
+            >
+              Load selected game
+            </button>
+
             <label className="toggle-row" htmlFor="show-best-move-toggle">
               <input
                 id="show-best-move-toggle"
@@ -173,7 +334,6 @@ export const ChessBoardWithControls = ({
               />
               <span>Show best move</span>
             </label>
-
             <label htmlFor="fen-input">Load FEN</label>
             <input
               id="fen-input"
@@ -198,6 +358,7 @@ export const ChessBoardWithControls = ({
               Load
             </button>
             {fenError ? <small>{fenError}</small> : null}
+            {fetchError ? <small>{fetchError}</small> : null}
           </div>
 
           {showMoveList ? (

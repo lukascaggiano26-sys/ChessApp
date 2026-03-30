@@ -64,9 +64,73 @@
   min-width: 0;
 }
 
+.board-analysis-stack {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.evalbar {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 8px;
+  width: 34px;
+}
+
+.evalbar-track-wrap {
+  border: 1px solid rgba(17, 24, 39, 0.18);
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.evalbar-track {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  background: #111827;
+}
+
+.evalbar-black {
+  background: #111827;
+  transition: height 140ms linear, width 140ms linear;
+}
+
+.evalbar-white {
+  background: #f9fafb;
+  transition: height 140ms linear, width 140ms linear;
+}
+
+.evalbar-meta {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.evalbar-score {
+  font-size: 13px;
+  line-height: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.evalbar-depth {
+  font-size: 11px;
+  color: #4b5563;
+  white-space: nowrap;
+}
+
 .fen-row {
   display: grid;
   gap: 8px;
+}
+
+.inline-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .toggle-row {
@@ -101,6 +165,37 @@
 @media (max-width: 900px) {
   .chess-layout {
     grid-template-columns: 1fr;
+  }
+
+  .board-analysis-stack {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .evalbar {
+    width: 100%;
+    grid-template-rows: auto auto;
+  }
+
+  .evalbar-track-wrap {
+    height: 18px;
+  }
+
+  .evalbar-track {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: none;
+  }
+
+  .evalbar-black,
+  .evalbar-white {
+    height: 100% !important;
+  }
+
+  .evalbar-meta {
+    grid-auto-flow: column;
+    justify-content: space-between;
+    align-items: center;
   }
 }
 
