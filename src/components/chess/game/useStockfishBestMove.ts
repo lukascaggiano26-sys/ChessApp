@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { LastMove, Square } from '../board';
-import stockfishUrl from 'stockfish/src/stockfish-nnue-16-single.js?url';
+import stockfishUrl from 'stockfish/bin/stockfish-18-lite-single.js?url';
 
 const SEARCH_DEPTH = 15;
 const EVAL_TIMEOUT_MS = 5000;
