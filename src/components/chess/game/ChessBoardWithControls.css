@@ -48,6 +48,33 @@
   font-weight: 600;
 }
 
+.material-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(17, 24, 39, 0.16);
+  background: rgba(255, 255, 255, 0.75);
+  color: #111827;
+  font-size: 12px;
+}
+
+.material-indicator--equal {
+  color: #4b5563;
+}
+
+.material-label {
+  opacity: 0.8;
+  letter-spacing: 0.01em;
+}
+
+.material-score {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1;
+}
+
 .chess-layout {
   display: grid;
   gap: 14px;

@@ -1,7 +1,8 @@
 import type { LastMove, Square } from '../board';
+import { formatSignedScore } from './evaluationBarUtils';
 
 export type EvaluationType = 'cp' | 'mate';
-export type EvaluationPerspective = 'white';
+export type EvaluationPerspective = 'white' | 'black';
 
 export interface StockfishEvaluation {
   type: EvaluationType;
@@ -27,8 +28,7 @@ const sideToMoveFromFen = (fen: string): 'w' | 'b' => {
 
 const formatCpDisplay = (centipawns: number): string => {
   const pawns = centipawns / 100;
-  const sign = pawns > 0 ? '+' : '';
-  return `${sign}${pawns.toFixed(1)}`;
+  return formatSignedScore(pawns, 1);
 };
 
 const formatMateDisplay = (mateIn: number): string => {
