@@ -630,9 +630,9 @@ export const ChessBoardWithControls = ({
                   </div>
                 ) : (
                   <p className="move-review-panel__placeholder">
-                    {moveReview
-                      ? 'Click a move in the list to see its review.'
-                      : 'Click "Review labels" to generate move review.'}
+                    {!moveReview
+                      ? 'Click "Review labels" to generate move review.'
+                      : 'Navigate to a move to see its review.'}
                   </p>
                 )}
               </section>
