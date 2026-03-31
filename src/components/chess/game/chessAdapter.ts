@@ -81,6 +81,7 @@ export const buildControllerState = ({
   lastMove,
   canUndo,
   canRedo,
+  movesSan = getMoveListSan(game),
 }: {
   game: ChessInstance;
   startingFen: string;
@@ -88,6 +89,7 @@ export const buildControllerState = ({
   lastMove: LastMove | null;
   canUndo: boolean;
   canRedo: boolean;
+  movesSan?: string[];
 }): ChessControllerState => ({
   startingFen,
   fen: game.fen(),
@@ -99,7 +101,7 @@ export const buildControllerState = ({
   checkSquare: kingSquareForTurn(game),
   draggedSquare: null,
   dragOverSquare: null,
-  movesSan: getMoveListSan(game),
+  movesSan,
   status: readStatus(game),
   canUndo,
   canRedo,
