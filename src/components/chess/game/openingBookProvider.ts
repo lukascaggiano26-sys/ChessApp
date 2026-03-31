@@ -42,4 +42,3 @@ export const staticOpeningLinesProvider: OpeningBookProvider = {
     return best ? toMatch(best) : null;
   },
 };
-

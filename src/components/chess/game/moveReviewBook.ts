@@ -25,6 +25,9 @@ export interface BookMoveDetector {
 
 const START_FEN = new Chess().fen();
 
+const fenPositionKey = (fen: string): string => fen.trim().split(/\s+/).slice(0, 4).join(' ');
+const START_FEN_KEY = fenPositionKey(START_FEN);
+
 const normalizeSanForBook = (san: string): string => {
   const trimmed = san.trim();
 
@@ -40,8 +43,8 @@ const normalizeSanForBook = (san: string): string => {
 };
 
 export const createBookMoveDetector = (provider: OpeningBookProvider): BookMoveDetector => ({
-  detectMove: ({ startingFen, movesSanPrefix }: BookMoveContext): BookDetectionResult => {
-    if (startingFen !== START_FEN || movesSanPrefix.length === 0) {
+  detectMove: ({ startingFen, movesSanPrefix, playedMoveSan, plyIndex }: BookMoveContext): BookDetectionResult => {
+    if (fenPositionKey(startingFen) !== START_FEN_KEY || movesSanPrefix.length === 0) {
       return {
         isBook: false,
         openingName: null,
@@ -54,6 +57,24 @@ export const createBookMoveDetector = (provider: OpeningBookProvider): BookMoveD
 
     const normalizedPrefix = movesSanPrefix.map(normalizeSanForBook);
     const match = provider.findBySanPrefix(normalizedPrefix);
+
+    if (
+      typeof console !== 'undefined' &&
+      movesSanPrefix.length <= 2 &&
+      normalizedPrefix[0] === 'e4' &&
+      (normalizedPrefix.length === 1 || normalizedPrefix[1] === 'e6')
+    ) {
+      console.debug('[move-review][book-debug]', {
+        ply: plyIndex + 1,
+        startingFen,
+        fenKey: fenPositionKey(startingFen),
+        playedMoveSan,
+        movesSanPrefixRaw: movesSanPrefix,
+        movesSanPrefixNormalized: normalizedPrefix,
+        matchedOpening: match ? `${match.ecoCode} ${match.openingName}` : null,
+        isBook: Boolean(match),
+      });
+    }
 
     if (!match) {
       return {

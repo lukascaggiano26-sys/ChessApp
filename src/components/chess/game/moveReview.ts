@@ -214,6 +214,25 @@ export const buildMoveReviewReport = async ({
       baseLabel: baseClassification.label as MoveReviewLabel | null,
     });
 
+    if (
+      debugMode &&
+      typeof console !== 'undefined' &&
+      sanPrefix.length <= 2 &&
+      sanPrefix[0] === 'e4' &&
+      (sanPrefix.length === 1 || sanPrefix[1] === 'e6')
+    ) {
+      console.debug('[move-review][french-debug]', {
+        ply: ply.plyIndex + 1,
+        startingFen,
+        sanPrefix,
+        normalizedSanPrefix: sanPrefix.map((san) => san.replace(/[+#]+$/g, '').replace(/[!?]+/g, '').trim()),
+        openingName: bookDetection.openingName,
+        ecoCode: bookDetection.ecoCode,
+        isBook: bookDetection.isBook,
+        finalLabel: labelResolution.label,
+      });
+    }
+
     reviewedMoves.push({
       plyIndex: ply.plyIndex,
       san: ply.san,

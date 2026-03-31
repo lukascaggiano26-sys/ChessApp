@@ -1,4 +1,5 @@
 import { enforceBestLabelBoundary } from '../src/components/chess/game/moveReviewBestBoundary.ts';
+import { OPENING_LINES } from '../src/components/chess/game/openingLines.ts';
 
 type Fixture = {
   name: string;
@@ -66,3 +67,28 @@ for (const fixture of fixtures) {
 }
 
 console.log(`move-review Best boundary checks passed (${fixtures.length} fixtures)`);
+
+const normalizeSanForBookCheck = (san: string): string =>
+  san
+    .trim()
+    .replace(/^0-0-0$/, 'O-O-O')
+    .replace(/^0-0$/, 'O-O')
+    .replace(/\$\d+/g, '')
+    .replace(/[!?]+/g, '')
+    .replace(/[+#]+$/g, '')
+    .replace(/\s*e\.?p\.?$/i, '')
+    .trim();
+
+const frenchPrefix = ['e4', 'e6'].map(normalizeSanForBookCheck);
+const frenchMatches = OPENING_LINES.filter((entry) =>
+  frenchPrefix.every((move, index) => entry.moves[index] === move),
+);
+const frenchBest = [...frenchMatches].sort((a, b) => b.moves.length - a.moves.length)[0] ?? null;
+
+if (!frenchBest || !frenchBest.name.includes('French Defense')) {
+  throw new Error(
+    `Book regression: expected French Defense match for prefix ${frenchPrefix.join(' ')}, got ${frenchBest?.name ?? 'none'}`,
+  );
+}
+
+console.log(`book-detection prefix check passed (matched ${frenchBest.eco} ${frenchBest.name})`);
