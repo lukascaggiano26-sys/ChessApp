@@ -353,21 +353,6 @@ export const ChessBoardWithControls = ({
         >
           Flip board ({displayPerspective === 'white' ? 'White' : 'Black'} view)
         </button>
-        <button
-          type="button"
-          className="chess-btn"
-          onClick={async () => {
-            try {
-              if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-                await navigator.clipboard.writeText(controller.fen);
-              }
-            } catch {
-              // no-op clipboard fallback
-            }
-          }}
-        >
-          Copy FEN
-        </button>
       </div>
 
       <div className="chess-layout">
