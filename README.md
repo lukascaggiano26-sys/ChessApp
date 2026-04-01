@@ -156,3 +156,17 @@ Returns state + handlers:
 
 - Promotion currently defaults to queen for move execution.
 - Drag-and-drop targets are square-driven (no fragile pixel coordinate math), so flipped orientation remains correct.
+
+## Move-review regression checks
+
+Run deterministic classification fixtures (no UI rendering required):
+
+```bash
+npm run check:move-review
+```
+
+This validates focused `Best` vs `Excellent` boundary fixtures, including:
+- `1. e4` followed by non-best `...e6` (must not be `Best`)
+- exact engine-best move (must be `Best`)
+- near-best non-identical move (must be `Excellent`)
+- a mate-score scenario
