@@ -40,8 +40,6 @@ export const ChessBoardWithControls = ({
 }: ChessBoardWithControlsProps): JSX.Element => {
   const controller = useChessGame({ initialFen, orientation, onMove });
   const { redoMove, undoMove, jumpToPly } = controller;
-  const [fenInput, setFenInput] = useState(controller.fen);
-  const [fenError, setFenError] = useState<string | null>(null);
   const [displayPerspective, setDisplayPerspective] = useState<'white' | 'black'>(orientation);
   const [showBestMove, setShowBestMove] = useState(false);
   const [chessComUsername, setChessComUsername] = useState('');
@@ -490,33 +488,6 @@ export const ChessBoardWithControls = ({
               />
               <span>Show best move</span>
             </label>
-            <label htmlFor="fen-input">Load FEN</label>
-            <input
-              id="fen-input"
-              className="fen-input"
-              value={fenInput}
-              onChange={(event) => setFenInput(event.target.value)}
-              placeholder="Paste FEN and click Load"
-            />
-            <button
-              type="button"
-              className="chess-btn"
-              onClick={() => {
-                const ok = controller.loadFen(fenInput);
-                if (!ok) {
-                  setFenError('Invalid FEN');
-                  return;
-                }
-
-                setFenError(null);
-                setActiveGame(null);
-                setMoveReview(null);
-                setReviewError(null);
-              }}
-            >
-              Load
-            </button>
-            {fenError ? <small>{fenError}</small> : null}
             {fetchError ? <small>{fetchError}</small> : null}
           </div>
 
