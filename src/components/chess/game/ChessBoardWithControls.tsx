@@ -40,8 +40,6 @@ export const ChessBoardWithControls = ({
 }: ChessBoardWithControlsProps): JSX.Element => {
   const controller = useChessGame({ initialFen, orientation, onMove });
   const { redoMove, undoMove, jumpToPly } = controller;
-  const [fenInput, setFenInput] = useState(controller.fen);
-  const [fenError, setFenError] = useState<string | null>(null);
   const [displayPerspective, setDisplayPerspective] = useState<'white' | 'black'>(orientation);
   const [showBestMove, setShowBestMove] = useState(false);
   const [chessComUsername, setChessComUsername] = useState('');
@@ -53,7 +51,6 @@ export const ChessBoardWithControls = ({
   const [moveReview, setMoveReview] = useState<MoveReviewReport | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [reviewSideFilter, setReviewSideFilter] = useState<'both' | 'white' | 'black'>('both');
   const [reviewDebugMode, setReviewDebugMode] = useState(false);
   const analysis = useStockfishAnalysis(controller.fen, true);
   const bestMoveArrow = showBestMove ? analysis.bestMove : null;
@@ -310,6 +307,10 @@ export const ChessBoardWithControls = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [redoMove, undoMove]);
 
+  useEffect(() => {
+    void runMoveReview();
+  }, [runMoveReview]);
+
   return (
     <section className={`chess-shell ${className ?? ''}`.trim()}>
       <div className="chess-toolbar">
@@ -351,21 +352,6 @@ export const ChessBoardWithControls = ({
           }
         >
           Flip board ({displayPerspective === 'white' ? 'White' : 'Black'} view)
-        </button>
-        <button
-          type="button"
-          className="chess-btn"
-          onClick={async () => {
-            try {
-              if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-                await navigator.clipboard.writeText(controller.fen);
-              }
-            } catch {
-              // no-op clipboard fallback
-            }
-          }}
-        >
-          Copy FEN
         </button>
       </div>
 
@@ -487,33 +473,6 @@ export const ChessBoardWithControls = ({
               />
               <span>Show best move</span>
             </label>
-            <label htmlFor="fen-input">Load FEN</label>
-            <input
-              id="fen-input"
-              className="fen-input"
-              value={fenInput}
-              onChange={(event) => setFenInput(event.target.value)}
-              placeholder="Paste FEN and click Load"
-            />
-            <button
-              type="button"
-              className="chess-btn"
-              onClick={() => {
-                const ok = controller.loadFen(fenInput);
-                if (!ok) {
-                  setFenError('Invalid FEN');
-                  return;
-                }
-
-                setFenError(null);
-                setActiveGame(null);
-                setMoveReview(null);
-                setReviewError(null);
-              }}
-            >
-              Load
-            </button>
-            {fenError ? <small>{fenError}</small> : null}
             {fetchError ? <small>{fetchError}</small> : null}
           </div>
 
@@ -521,74 +480,54 @@ export const ChessBoardWithControls = ({
             <>
               <div className="-header">
                 <h4>Moves</h4>
-                <button type="button" className="chess-btn" onClick={runMoveReview} disabled={reviewLoading}>
-                  {reviewLoading ? 'Reviewing…' : 'Review labels'}
-                </button>
-              </div>
-              <div className="move-filter-row">
-                <label htmlFor="move-filter-side">Show:</label>
-                <select
-                  id="move-filter-side"
-                  className="fen-input"
-                  value={reviewSideFilter}
-                  onChange={(event) => setReviewSideFilter(event.target.value as 'both' | 'white' | 'black')}
-                >
-                  <option value="both">Both</option>
-                  <option value="white">White</option>
-                  <option value="black">Black</option>
-                </select>
               </div>
               {reviewError ? <small>{reviewError}</small> : null}
               <ol className="move-list move-list--review">
                 {groupedMoves.map((row) => (
                   <li key={row.moveNumber} className="move-row">
                     <span className="move-number">{row.moveNumber}.</span>
-                    {reviewSideFilter !== 'black' ? (
-                      <span className="move-entry">
-                        <button
-                          type="button"
-                          className={`move-entry-button ${controller.currentPly === row.whitePly ? 'is-active' : ''}`}
-                          onClick={() => controller.jumpToPly(row.whitePly)}
-                          disabled={!row.hasWhiteMove}
+                    <span className="move-entry">
+                      <button
+                        type="button"
+                        className={`move-entry-button ${controller.currentPly === row.whitePly ? 'is-active' : ''}`}
+                        onClick={() => controller.jumpToPly(row.whitePly)}
+                        disabled={!row.hasWhiteMove}
+                      >
+                        {row.white?.san ?? controller.movesSan[row.whitePly - 1] ?? '--'}
+                      </button>
+                      {row.white?.moveLabel ? (
+                        <span
+                          className={`move-label-badge move-label-badge--${row.white.moveLabel.toLowerCase()}`}
+                          title={row.white.labelExplanationSeed ?? row.white.labelReason ?? ''}
                         >
-                          {row.white?.san ?? controller.movesSan[row.whitePly - 1] ?? '--'}
-                        </button>
-                        {row.white?.moveLabel ? (
-                          <span
-                            className={`move-label-badge move-label-badge--${row.white.moveLabel.toLowerCase()}`}
-                            title={row.white.labelExplanationSeed ?? row.white.labelReason ?? ''}
-                          >
-                            {row.white.moveLabel}
-                          </span>
-                        ) : moveReview ? (
-                          <span className="move-label-placeholder">—</span>
-                        ) : (
-                          <span className="move-label-placeholder">…</span>
-                        )}
-                      </span>
-                    ) : null}
-                    {reviewSideFilter !== 'white' ? (
-                      <span className="move-entry">
-                        <button
-                          type="button"
-                          className={`move-entry-button ${controller.currentPly === row.blackPly ? 'is-active' : ''}`}
-                          onClick={() => controller.jumpToPly(row.blackPly)}
-                          disabled={!row.hasBlackMove}
+                          {row.white.moveLabel}
+                        </span>
+                      ) : moveReview ? (
+                        <span className="move-label-placeholder">—</span>
+                      ) : (
+                        <span className="move-label-placeholder">…</span>
+                      )}
+                    </span>
+                    <span className="move-entry">
+                      <button
+                        type="button"
+                        className={`move-entry-button ${controller.currentPly === row.blackPly ? 'is-active' : ''}`}
+                        onClick={() => controller.jumpToPly(row.blackPly)}
+                        disabled={!row.hasBlackMove}
+                      >
+                        {row.black?.san ?? controller.movesSan[row.blackPly - 1] ?? '--'}
+                      </button>
+                      {row.black?.moveLabel ? (
+                        <span
+                          className={`move-label-badge move-label-badge--${row.black.moveLabel.toLowerCase()}`}
+                          title={row.black.labelExplanationSeed ?? row.black.labelReason ?? ''}
                         >
-                          {row.black?.san ?? controller.movesSan[row.blackPly - 1] ?? '--'}
-                        </button>
-                        {row.black?.moveLabel ? (
-                          <span
-                            className={`move-label-badge move-label-badge--${row.black.moveLabel.toLowerCase()}`}
-                            title={row.black.labelExplanationSeed ?? row.black.labelReason ?? ''}
-                          >
-                            {row.black.moveLabel}
-                          </span>
-                        ) : moveReview && controller.movesSan[(row.moveNumber - 1) * 2 + 1] ? (
-                          <span className="move-label-placeholder">—</span>
-                        ) : null}
-                      </span>
-                    ) : null}
+                          {row.black.moveLabel}
+                        </span>
+                      ) : moveReview && controller.movesSan[(row.moveNumber - 1) * 2 + 1] ? (
+                        <span className="move-label-placeholder">—</span>
+                      ) : null}
+                    </span>
                   </li>
                 ))}
               </ol>
@@ -634,9 +573,7 @@ export const ChessBoardWithControls = ({
                   </div>
                 ) : (
                   <p className="move-review-panel__placeholder">
-                    {!moveReview
-                      ? 'Click "Review labels" to generate move review.'
-                      : 'Navigate to a move to see its review.'}
+                    {!moveReview ? (reviewLoading ? 'Reviewing moves…' : 'Play a move to generate review.') : 'Navigate to a move to see its review.'}
                   </p>
                 )}
               </section>

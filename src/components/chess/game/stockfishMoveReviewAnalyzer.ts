@@ -1,5 +1,6 @@
 import stockfishUrl from 'stockfish/bin/stockfish-18-lite-single.js?url';
 import { parseBestMove, parseInfoLine, type StockfishEvaluation } from './stockfishAnalysis';
+import { applyUciMoveToFen } from './moveReviewTraversal';
 import type { PositionAnalyzer, PositionAnalysis } from './moveReviewTypes';
 
 export interface StockfishMoveReviewAnalyzerOptions {
@@ -7,8 +8,10 @@ export interface StockfishMoveReviewAnalyzerOptions {
   timeoutMs?: number;
 }
 
-const DEFAULT_DEPTH = 14;
-const DEFAULT_TIMEOUT_MS = 5000;
+// Move-review labeling is sensitive in openings where many moves are close.
+// Use a slightly deeper default search for more stable best-move selection.
+const DEFAULT_DEPTH = 16;
+const DEFAULT_TIMEOUT_MS = 7000;
 
 export class StockfishMoveReviewAnalyzer implements PositionAnalyzer {
   private readonly worker: Worker;
@@ -75,8 +78,13 @@ export class StockfishMoveReviewAnalyzer implements PositionAnalyzer {
         if (!bestMove) {
           return;
         }
-  
-        bestMoveUci = `${bestMove.from}${bestMove.to}`;
+
+        const candidateBestMoveUci = `${bestMove.from}${bestMove.to}`;
+        if (!applyUciMoveToFen(fen, candidateBestMoveUci)) {
+          // Guard against stale worker output from a previous position search.
+          return;
+        }
+        bestMoveUci = candidateBestMoveUci;
         cleanup();
         resolve({ bestMoveUci, bestLine, evaluation });
       };
